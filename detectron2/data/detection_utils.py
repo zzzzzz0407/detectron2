@@ -12,6 +12,48 @@ import torch
 from fvcore.common.file_io import PathManager
 from PIL import Image
 
+import os
+import zipfile
+import cv2
+import numpy as np
+
+_im_zfile = []
+
+
+def zipimread(filename, flags=cv2.IMREAD_COLOR):
+    global _im_zfile
+
+    path_dir, path_file = os.path.split(filename)
+    filename = os.path.join(path_dir + ".zip@", path_file)
+
+    path = filename
+    if flags == "unchanged":
+        flags = cv2.IMREAD_UNCHANGED
+    pos_at = path.index('@')
+    if pos_at == -1:
+        print("character '@' is not found from the given path '%s'"%(path))
+        assert 0
+    path_zip = path[0: pos_at]
+    dataset_prefix = os.path.basename(path_zip).split('.')[0]
+    path_img = dataset_prefix + path[pos_at + 1:]
+    if not os.path.isfile(path_zip):
+        print("zip file '%s' is not found"%(path_zip))
+        assert 0
+    for i in range(len(_im_zfile)):
+        if _im_zfile[i]['path'] == path_zip:
+            data = _im_zfile[i]['zipfile'].read(path_img)
+            return cv2.imdecode(np.frombuffer(data, np.uint8), flags)
+
+    # print("read new image zip file '%s', '%s"%(path_zip, path_img))
+    _im_zfile.append({
+        'path': path_zip,
+        'zipfile': zipfile.ZipFile(path_zip, 'r')
+    })
+    data = _im_zfile[-1]['zipfile'].read(path_img)
+
+    return cv2.imdecode(np.frombuffer(data, np.uint8), flags)
+
+
 from detectron2.structures import (
     BitMasks,
     Boxes,
@@ -172,6 +214,10 @@ def read_image(file_name, format=None):
         image (np.ndarray): an HWC image in the given format, which is 0-255, uint8 for
             supported image modes in PIL or "BGR"; float (0-1 for Y) for YUV-BT.601.
     """
+    image = zipimread(file_name)
+    return image
+
+    """
     with PathManager.open(file_name, "rb") as f:
         image = Image.open(f)
 
@@ -179,6 +225,7 @@ def read_image(file_name, format=None):
         image = _apply_exif_orientation(image)
 
         return convert_PIL_to_numpy(image, format)
+    """
 
 
 def check_image_size(dataset_dict, image):
