@@ -1,0 +1,18 @@
+_BASE_: "Base-SOD.yaml"
+MODEL:
+  WEIGHTS: "models/R-50.pkl"
+  RESNETS:
+    DEPTH: 50
+  SOD:
+    TYPE_ATTENTION: "softmax"
+    USE_BASE: True
+    PE_ON: True
+    WITH_COORD: False
+    CENTER_SYMMETRY: False
+    SCALE_VARIANCE: True
+    LOC_PRIOR: False
+SOLVER:
+  IMS_PER_BATCH: 16
+  BASE_LR: 0.001
+  STEPS: (120000, 160000)
+  MAX_ITER: 180000

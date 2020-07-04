@@ -1,0 +1,14 @@
+_BASE_: "Base-SOD.yaml"
+MODEL:
+  WEIGHTS: "models/R-50.pkl"
+  RESNETS:
+    DEPTH: 50
+  SOD:
+    TYPE_ATTENTION: "softmax"
+    CENTER_SYMMETRY: True
+    SCALE_VARIANCE: False
+    INSTANCE_IN_FEATURES: ["p3"]
+    NUM_GRIDS: [10]
+    FPN_INSTANCE_STRIDES: [8]
+DATASETS:
+  TRAIN: ("coco_2017_val",)

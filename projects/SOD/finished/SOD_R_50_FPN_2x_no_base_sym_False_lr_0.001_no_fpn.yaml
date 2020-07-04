@@ -1,0 +1,19 @@
+_BASE_: "Base-SOD.yaml"
+MODEL:
+  WEIGHTS: "models/R-50.pkl"
+  RESNETS:
+    DEPTH: 50
+  SOD:
+    USE_BASE: False
+    CENTER_SYMMETRY: False
+    SCALE_VARIANCE: False
+    PE_ON: False
+    WITH_COORD: True
+    INSTANCE_IN_FEATURES: ["p5"]
+    FPN_INSTANCE_STRIDES: [32]
+    NUM_GRIDS: [10]
+SOLVER:
+  IMS_PER_BATCH: 16
+  BASE_LR: 0.001
+  STEPS: (120000, 160000)
+  MAX_ITER: 180000
