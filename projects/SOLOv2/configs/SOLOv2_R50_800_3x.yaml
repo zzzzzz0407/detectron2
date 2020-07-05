@@ -1,0 +1,15 @@
+_BASE_: "Base-SOLOv2.yaml"
+MODEL:
+  WEIGHTS: "/mnt/cephfs_new_wj/mlnlp/zhangrufeng/pretrained/detectron2/R-50.pkl"
+  RESNETS:
+    DEPTH: 50
+  SOLOV2:
+    NUM_INSTANCE_CONVS: 4
+    USE_DCN_IN_INSTANCE: False
+SOLVER:
+  WARMUP_FACTOR: 0.01
+  WARMUP_ITERS: 500
+  STEPS: (210000, 250000)
+  MAX_ITER: 270000
+DATASETS:
+  TRAIN: ("coco_2017_train",)

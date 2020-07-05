@@ -1,0 +1,26 @@
+{
+    "resources": {
+        "cpu": 60,
+        "gpu": 8,
+        "mem": 120000,
+        "gpuv": "",
+        "slice_id": 95
+
+    },
+    "envs": {
+    },
+    "paths": {
+        "PYTHONPATH": "{TOU_DIR}"
+    },
+    "name": "solov2",
+    "comment": "mmdet",
+    "entry": {
+        "cmd": "sh",
+        "args": ["{TOU_DIR}/train_tmp.sh"],
+        "kwargs":"1"
+    },
+    "parameters": {
+        "train-data-path": "/mnt/cephfs/c ommon/ad/zhangbowen.berwyn/ddatabase_20180627/train_20180414_20180612_lmdb"
+    }
+}
+
