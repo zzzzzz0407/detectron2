@@ -31,10 +31,10 @@ echo 'Finish Downloading Data.'
 
 # process.
 ######################################################
-CONFIG_FILE=${CURDIR}/configs/zhang/SOLOv2_R50_800_3x_lvis.yaml
+CONFIG_FILE=${CURDIR}/configs/zhang/SOLOv2_R50_800_1x_lvis.yaml
 GPU_NUM=8
-OUTPUT_DIR=${CURDIR}/models/SOLOv2_R50_800_3x_lvis
-HDFS_DIR=${HDFS_ROOT}/models/solov2/SOLOv2_R50_800_3x_lvis
+OUTPUT_DIR=${CURDIR}/models/SOLOv2_R50_800_1x_lvis
+HDFS_DIR=${HDFS_ROOT}/models/solov2/SOLOv2_R50_800_1x_lvis
 
 hdfs dfs -mkdir -p ${HDFS_DIR}
 
