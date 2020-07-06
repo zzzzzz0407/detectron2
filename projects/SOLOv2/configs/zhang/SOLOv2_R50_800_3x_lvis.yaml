@@ -1,0 +1,25 @@
+_BASE_: "../Base-SOLOv2.yaml"
+MODEL:
+  WEIGHTS: "models/R-50.pkl"
+  RESNETS:
+    DEPTH: 50
+  SOLOV2:
+    NUM_CLASSES: 1203
+    NUM_GRIDS: [60, 44, 32, 20, 10]
+    NUM_INSTANCE_CONVS: 4
+    USE_DCN_IN_INSTANCE: False
+    # post-process.
+    NMS_PRE: 2000
+    SCORE_THR: 0.005
+    UPDATE_THR: 0.0025
+    MAX_PER_IMG: 300
+SOLVER:
+  STEPS: (210000, 250000)
+  MAX_ITER: 270000
+DATASETS:
+  TRAIN: ("lvis_v1_train",)
+  # TRAIN: ("lvis_v1_val",)
+  TEST: ("lvis_v1_val",)
+DATALOADER:
+  SAMPLER_TRAIN: "RepeatFactorTrainingSampler"
+  REPEAT_THRESHOLD: 0.001
