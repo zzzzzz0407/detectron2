@@ -1,5 +1,6 @@
 _BASE_: "../Base-SOLOv2.yaml"
 MODEL:
+  META_ARCHITECTURE: "SOLOv2_LVIS"
   WEIGHTS: "models/R-50.pkl"
   RESNETS:
     DEPTH: 50
@@ -10,8 +11,8 @@ MODEL:
     USE_DCN_IN_INSTANCE: False
     # post-process.
     NMS_TYPE: "matrix"
-    NMS_PRE: 1000
-    SCORE_THR: 0.1
+    NMS_PRE: 2000
+    SCORE_THR: 0.05
     UPDATE_THR: 0.0025
     MAX_PER_IMG: 300
 SOLVER:
