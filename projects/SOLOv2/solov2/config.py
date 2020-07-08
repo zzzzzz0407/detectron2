@@ -43,6 +43,8 @@ def add_solov2_config(cfg):
     cfg.MODEL.SOLOV2.UPDATE_THR = 0.05
     cfg.MODEL.SOLOV2.MASK_THR = 0.5
     cfg.MODEL.SOLOV2.MAX_PER_IMG = 100
+    # matrix / mask
+    cfg.MODEL.SOLOV2.NMS_TYPE = "matrix"
     # gaussian / linear
     cfg.MODEL.SOLOV2.NMS_KERNEL = "gaussian"
     cfg.MODEL.SOLOV2.NMS_SIGMA = 2

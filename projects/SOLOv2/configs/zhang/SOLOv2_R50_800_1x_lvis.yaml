@@ -9,8 +9,9 @@ MODEL:
     NUM_INSTANCE_CONVS: 4
     USE_DCN_IN_INSTANCE: False
     # post-process.
-    NMS_PRE: 2000
-    SCORE_THR: 0.005
+    NMS_TYPE: "matrix"
+    NMS_PRE: 1000
+    SCORE_THR: 0.1
     UPDATE_THR: 0.0025
     MAX_PER_IMG: 300
 SOLVER:

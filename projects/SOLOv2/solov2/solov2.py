@@ -68,6 +68,7 @@ class SOLOv2(nn.Module):
         self.max_per_img = cfg.MODEL.SOLOV2.MAX_PER_IMG
         self.nms_kernel = cfg.MODEL.SOLOV2.NMS_KERNEL
         self.nms_sigma = cfg.MODEL.SOLOV2.NMS_SIGMA
+        self.nms_type = cfg.MODEL.SOLOV2.NMS_TYPE
 
         # build the backbone.
         self.backbone = build_backbone(cfg)
@@ -391,6 +392,37 @@ class SOLOv2(nn.Module):
 
         return cate_scores_update
 
+    @staticmethod
+    def mask_nms(cate_labels, seg_masks, sum_masks, cate_scores, nms_thr=0.5):
+        n_samples = len(cate_scores)
+        if n_samples == 0:
+            return []
+
+        keep = seg_masks.new_ones(cate_scores.shape)
+        seg_masks = seg_masks.float()
+
+        for i in range(n_samples - 1):
+            if not keep[i]:
+                continue
+            mask_i = seg_masks[i]
+            label_i = cate_labels[i]
+            for j in range(i + 1, n_samples, 1):
+                if not keep[j]:
+                    continue
+                mask_j = seg_masks[j]
+                label_j = cate_labels[j]
+                if label_i != label_j:
+                    continue
+                # overlaps
+                inter = (mask_i * mask_j).sum()
+                union = sum_masks[i] + sum_masks[j] - inter
+                if union > 0:
+                    if inter / union > nms_thr:
+                        keep[j] = False
+                else:
+                    keep[j] = False
+        return keep
+
     def inference(self, pred_cates, pred_kernels, pred_masks, cur_sizes, images):
         """
         Arguments:
@@ -519,11 +551,18 @@ class SOLOv2(nn.Module):
         cate_scores = cate_scores[sort_inds]
         cate_labels = cate_labels[sort_inds]
 
-        # Matrix NMS
-        cate_scores = self.matrix_nms(cate_labels, seg_masks, sum_masks, cate_scores,
-                                      sigma=self.nms_sigma, kernel=self.nms_kernel)
-        # filter.
-        keep = cate_scores >= self.update_threshold
+        if self.nms_type == "matrix":
+            # matrix nms & filter.
+            cate_scores = self.matrix_nms(cate_labels, seg_masks, sum_masks, cate_scores,
+                                          sigma=self.nms_sigma, kernel=self.nms_kernel)
+            keep = cate_scores >= self.update_threshold
+        elif self.nms_type == "mask":
+            # original mask nms.
+            keep = self.mask_nms(cate_labels, seg_masks, sum_masks, cate_scores,
+                                 nms_thr=self.mask_threshold)
+        else:
+            raise NotImplementedError
+
         if keep.sum() == 0:
             results = Instances(ori_size)
             results.scores = torch.tensor([])
@@ -531,6 +570,7 @@ class SOLOv2(nn.Module):
             results.pred_masks = torch.tensor([])
             results.pred_boxes = Boxes(torch.tensor([]))
             return results
+
         seg_preds = seg_preds[keep, :, :]
         cate_scores = cate_scores[keep]
         cate_labels = cate_labels[keep]

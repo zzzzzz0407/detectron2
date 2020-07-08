@@ -10,7 +10,7 @@ MODEL:
     USE_DCN_IN_INSTANCE: False
     # post-process.
     NMS_PRE: 2000
-    SCORE_THR: 0.005
+    SCORE_THR: 0.05
     UPDATE_THR: 0.0025
     MAX_PER_IMG: 300
 SOLVER:
