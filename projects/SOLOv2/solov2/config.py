@@ -55,3 +55,7 @@ def add_solov2_config(cfg):
     cfg.MODEL.SOLOV2.LOSS.FOCAL_GAMMA = 2.0
     cfg.MODEL.SOLOV2.LOSS.FOCAL_WEIGHT = 1.0
     cfg.MODEL.SOLOV2.LOSS.DICE_WEIGHT = 3.0
+
+    # Optional Params.
+    cfg.MODEL.SOLOV2.FLAG_SEMI = False
+    cfg.MODEL.SOLOV2.RATIO_SEMI = 0.1

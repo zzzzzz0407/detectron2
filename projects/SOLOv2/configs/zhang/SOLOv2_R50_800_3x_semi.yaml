@@ -1,0 +1,13 @@
+_BASE_: "../Base-SOLOv2.yaml"
+MODEL:
+  WEIGHTS: "models/R-50.pkl"
+  RESNETS:
+    DEPTH: 50
+  SOLOV2:
+    NUM_INSTANCE_CONVS: 4
+    USE_DCN_IN_INSTANCE: False
+    FLAG_SEMI: True
+    RATIO_SEMI: 0.1
+SOLVER:
+  STEPS: (210000, 250000)
+  MAX_ITER: 270000

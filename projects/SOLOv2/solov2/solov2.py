@@ -21,6 +21,7 @@ from .utils import imrescale
 from .loss import dice_loss, FocalLoss
 #from detectron2.layers.DFConv2d import DFConv2d
 #from IPython import embed
+import random
 
 
 __all__ = ["SOLOv2"]
@@ -91,6 +92,10 @@ class SOLOv2(nn.Module):
         #                            gamma=cfg.MODEL.SOLOV2.LOSS.FOCAL_GAMMA,
         #                            alpha=cfg.MODEL.SOLOV2.LOSS.FOCAL_ALPHA,
         #                            loss_weight=cfg.MODEL.SOLOV2.LOSS.FOCAL_WEIGHT)
+
+        # optional params.
+        self.flag_semi = cfg.MODEL.SOLOV2.FLAG_SEMI
+        self.ratio_semi = cfg.MODEL.SOLOV2.RATIO_SEMI
 
         # image transform
         pixel_mean = torch.Tensor(cfg.MODEL.PIXEL_MEAN).to(self.device).view(3, 1, 1)
@@ -313,8 +318,17 @@ class SOLOv2(nn.Module):
                 continue
             input = torch.sigmoid(input)
             loss_ins.append(dice_loss(input, target))
-        loss_ins = torch.cat(loss_ins).mean()
-        loss_ins = loss_ins * self.ins_loss_weight
+
+        a = 1
+        if self.flag_semi:
+            loss_ins = torch.cat(loss_ins)
+            list_ins = [_ for _ in range(len(loss_ins))]
+            num_sampled = int(math.ceil(self.ratio_semi * len(loss_ins)))
+            index_sampled = cate_label_list[0][0].new_tensor(random.sample(list_ins, num_sampled))
+            loss_ins_mean = loss_ins[index_sampled].mean()
+        else:
+            loss_ins_mean = torch.cat(loss_ins).mean()
+        loss_ins = loss_ins_mean * self.ins_loss_weight
 
         # cate
         cate_labels = [
