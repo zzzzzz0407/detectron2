@@ -9,6 +9,7 @@ MODEL:
     NUM_INSTANCE_CONVS: 4
     USE_DCN_IN_INSTANCE: False
     # post-process.
+    NMS_TYPE: "matrix"
     NMS_PRE: 2000
     SCORE_THR: 0.05
     UPDATE_THR: 0.0025
