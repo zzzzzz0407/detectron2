@@ -11,3 +11,6 @@ MODEL:
 SOLVER:
   STEPS: (210000, 250000)
   MAX_ITER: 270000
+DATASETS:
+  TRAIN: ("coco_2017_val",)
+  TEST: ("coco_2017_val",)

@@ -1,0 +1,10 @@
+_BASE_: "../../../configs/Base-RCNN-FPN.yaml"
+MODEL:
+  MOBILENETV3: True
+  WEIGHTS: "models/mobilenet_v3_large.pth"
+  MASK_ON: True
+  BACKBONE:
+    NAME: "build_mobilenet_fpn_backbone"
+SOLVER:
+  STEPS: (210000, 250000)
+  MAX_ITER: 270000
