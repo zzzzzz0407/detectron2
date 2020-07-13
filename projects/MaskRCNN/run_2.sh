@@ -32,9 +32,9 @@ echo 'Finish Downloading Data.'
 # process.
 ######################################################
 CONFIG_FILE=${CURDIR}/configs/zhang/mask_rcnn_R_50_FPN_1x_semi.yaml
-GPU_NUM=8
-OUTPUT_DIR=${CURDIR}/models/mask_rcnn_R_50_FPN_1x_semi
-HDFS_DIR=${HDFS_ROOT}/models/detectron2/semi/mask_rcnn_R_50_FPN_1x_semi
+GPU_NUM=4
+OUTPUT_DIR=${CURDIR}/models/mask_rcnn_R_50_FPN_1x_semi_4gpu
+HDFS_DIR=${HDFS_ROOT}/models/detectron2/semi/mask_rcnn_R_50_FPN_1x_semi_4gpu
 
 hdfs dfs -mkdir -p ${HDFS_DIR}
 
