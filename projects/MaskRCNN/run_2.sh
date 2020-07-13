@@ -18,7 +18,7 @@ echo 'The work dir is: ' ${CURDIR}
 
 # data.
 ######################################################
-HDFS_ROOT=hdfs://haruna/home/byte_arnold_hl_mlnlc/user/zhangrufeng/
+HDFS_ROOT=hdfs://haruna/home/byte_arnold_lq_mlnlc/user/zhangrufeng/
 mkdir -p ${CURDIR}/datasets/coco
 mkdir -p ${CURDIR}/models
 echo 'Start Downloading Data.'
