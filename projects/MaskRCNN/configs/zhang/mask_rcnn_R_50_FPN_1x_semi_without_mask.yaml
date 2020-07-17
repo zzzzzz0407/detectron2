@@ -9,7 +9,7 @@ MODEL:
     WITH_MASK_LOSS: False
   ROI_HEADS:
     NAME: "SemiStandardROIHeads"
-  FLAG_SEMI: False
+  FLAG_SEMI: True
 DATASETS:
   TRAIN: ("instances_train2017_semi_0.1_min_200",)
   TEST: ("coco_2017_val",)
