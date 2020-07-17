@@ -90,6 +90,7 @@ class SemiStandardROIHeads(ROIHeads):
         keypoint_head: Optional[nn.Module] = None,
         train_on_pred_boxes: bool = False,
         flag_semi: bool = False,
+        with_mask_loss: bool = True,
         **kwargs
     ):
         """
@@ -129,12 +130,14 @@ class SemiStandardROIHeads(ROIHeads):
 
         self.train_on_pred_boxes = train_on_pred_boxes
         self.flag_semi = flag_semi
+        self.with_mask_loss = with_mask_loss
 
     @classmethod
     def from_config(cls, cfg, input_shape):
         ret = super().from_config(cfg)
         ret["train_on_pred_boxes"] = cfg.MODEL.ROI_BOX_HEAD.TRAIN_ON_PRED_BOXES
         ret["flag_semi"] = cfg.MODEL.FLAG_SEMI
+        ret["with_mask_loss"] = cfg.MODEL.ROI_MASK_HEAD.WITH_MASK_LOSS
         # Subclasses that have not been updated to use from_config style construction
         # may have overridden _init_*_head methods. In this case, those overridden methods
         # will not be classmethods and we need to avoid trying to call them here.
@@ -258,7 +261,12 @@ class SemiStandardROIHeads(ROIHeads):
             # Usually the original proposals used by the box head are used by the mask, keypoint
             # heads. But when `self.train_on_pred_boxes is True`, proposals will contain boxes
             # predicted by the box head.
-            losses.update(self._forward_mask(features, proposals))
+            mask_loss = self._forward_mask(features, proposals)
+            if self.with_mask_loss:
+                losses.update(mask_loss)
+            else:
+                mask_loss['loss_mask'] = 0. * mask_loss['loss_mask']
+                losses.update(mask_loss)
             losses.update(self._forward_keypoint(features, proposals))
             return proposals, losses
         else:

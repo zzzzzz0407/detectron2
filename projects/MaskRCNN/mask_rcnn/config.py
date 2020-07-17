@@ -12,3 +12,5 @@ def add_extra_config(cfg):
     _C.MODEL.MOBILENETV3 = False
     # add for semi params.
     _C.MODEL.FLAG_SEMI = False
+    # add for mask head.
+    _C.MODEL.ROI_MASK_HEAD.WITH_MASK_LOSS = True

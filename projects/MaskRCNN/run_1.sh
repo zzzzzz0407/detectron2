@@ -31,14 +31,16 @@ echo 'Finish Downloading Data.'
 
 # process.
 ######################################################
-CONFIG_FILE=${CURDIR}/configs/zhang/mask_rcnn_R_50_FPN_1x.yaml
+URL=tcp://127.0.0.1:50001
+CONFIG_FILE=${CURDIR}/configs/zhang/mask_rcnn_R_50_FPN_1x_mask_1.yaml
 GPU_NUM=4
-OUTPUT_DIR=${CURDIR}/models/mask_rcnn_R_50_FPN_1x_4gpu
-HDFS_DIR=${HDFS_ROOT}/models/detectron2/semi/mask_rcnn_R_50_FPN_1x_4gpu
+OUTPUT_DIR=${CURDIR}/models/mask_rcnn_R_50_FPN_1x_mask_1
+HDFS_DIR=${HDFS_ROOT}/models/detectron2/semi/mask_rcnn_R_50_FPN_1x_mask_1
 
 hdfs dfs -mkdir -p ${HDFS_DIR}
 
-python3 ${CURDIR}/train_net.py --config-file ${CONFIG_FILE} \
+python3 ${CURDIR}/train_net.py --dist-url ${URL} \
+--config-file ${CONFIG_FILE} \
 --num-gpus ${GPU_NUM} OUTPUT_DIR ${OUTPUT_DIR}
 
 python3 ${CURDIR}/zip_uploading.py --local-dir ${OUTPUT_DIR} --dst-dir ${HDFS_DIR}
