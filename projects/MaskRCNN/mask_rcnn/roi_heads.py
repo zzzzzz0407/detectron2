@@ -20,7 +20,7 @@ from detectron2.modeling.roi_heads import ROIHeads
 from detectron2.modeling.roi_heads.box_head import build_box_head
 from detectron2.modeling.roi_heads.fast_rcnn import FastRCNNOutputLayers
 from detectron2.modeling.roi_heads.keypoint_head import build_keypoint_head
-from detectron2.modeling.roi_heads.mask_head import build_mask_head
+from .mask_head import build_mask_head
 
 logger = logging.getLogger(__name__)
 
@@ -48,17 +48,25 @@ def select_foreground_proposals(
     assert proposals[0].has("gt_classes")
     fg_proposals = []
     fg_selection_masks = []
+    proposals_with_blinds = []
+    proposals_without_blinds = []
     for proposals_per_image in proposals:
         gt_classes = proposals_per_image.gt_classes
-        if flag_semi:
-            gt_blinds = proposals_per_image.gt_blinds
-            fg_selection_mask = (gt_classes != -1) & (gt_classes != bg_label) & (gt_blinds == 1)
-        else:
-            fg_selection_mask = (gt_classes != -1) & (gt_classes != bg_label)
+        fg_selection_mask = (gt_classes != -1) & (gt_classes != bg_label)
         fg_idxs = fg_selection_mask.nonzero().squeeze(1)
         fg_proposals.append(proposals_per_image[fg_idxs])
         fg_selection_masks.append(fg_selection_mask)
-    return fg_proposals, fg_selection_masks
+        # appended by rufeng zhang.
+        if flag_semi:
+            gt_blinds = proposals_per_image.gt_blinds
+            fg_with_blinds = fg_selection_mask & (gt_blinds == 1)
+            fg_without_blinds = fg_selection_mask & (gt_blinds != 1)
+            idxs_with_blinds = fg_with_blinds.nonzero().squeeze(1)
+            idxs_without_blinds = fg_without_blinds.nonzero().squeeze(1)
+            proposals_with_blinds.append(proposals_per_image[idxs_with_blinds])
+            proposals_without_blinds.append(proposals_per_image[idxs_without_blinds])
+
+    return fg_proposals, fg_selection_masks, proposals_with_blinds, proposals_without_blinds
 
 
 @ROI_HEADS_REGISTRY.register()
@@ -90,6 +98,7 @@ class SemiStandardROIHeads(ROIHeads):
         keypoint_head: Optional[nn.Module] = None,
         train_on_pred_boxes: bool = False,
         flag_semi: bool = False,
+        flag_gap: bool = False,
         with_mask_loss: bool = True,
         **kwargs
     ):
@@ -129,15 +138,22 @@ class SemiStandardROIHeads(ROIHeads):
             self.keypoint_head = keypoint_head
 
         self.train_on_pred_boxes = train_on_pred_boxes
+
+        # appended by rufeng zhang.
         self.flag_semi = flag_semi
+        self.flag_gap = flag_gap
         self.with_mask_loss = with_mask_loss
 
     @classmethod
     def from_config(cls, cfg, input_shape):
         ret = super().from_config(cfg)
         ret["train_on_pred_boxes"] = cfg.MODEL.ROI_BOX_HEAD.TRAIN_ON_PRED_BOXES
+
+        # appended by rufeng zhang.
         ret["flag_semi"] = cfg.MODEL.FLAG_SEMI
+        ret["flag_gap"] = cfg.MODEL.FLAG_GAP
         ret["with_mask_loss"] = cfg.MODEL.ROI_MASK_HEAD.WITH_MASK_LOSS
+
         # Subclasses that have not been updated to use from_config style construction
         # may have overridden _init_*_head methods. In this case, those overridden methods
         # will not be classmethods and we need to avoid trying to call them here.
@@ -367,10 +383,25 @@ class SemiStandardROIHeads(ROIHeads):
 
         if self.training:
             # The loss is only defined on positive proposals.
-            proposals, _ = select_foreground_proposals(instances, self.num_classes, self.flag_semi)
-            proposal_boxes = [x.proposal_boxes for x in proposals]
-            mask_features = self.mask_pooler(features, proposal_boxes)
-            return self.mask_head(mask_features, proposals)
+            proposals, _, \
+                proposals_with_blinds, proposals_without_blinds = select_foreground_proposals(instances, self.num_classes, self.flag_semi)
+            if self.flag_semi:
+                # blind masks.
+                blinds_boxes = [x.proposal_boxes for x in proposals_with_blinds]
+                blinds_features = self.mask_pooler(features, blinds_boxes)
+                mask_losses = self.mask_head(blinds_features, proposals_with_blinds, gap_on=False)
+                if self.flag_gap:
+                    # gap masks.
+                    gap_boxes = [x.proposal_boxes for x in proposals_without_blinds]
+                    gap_features = self.mask_pooler(features, gap_boxes)
+                    gap_losses = self.mask_head(gap_features, proposals_without_blinds, gap_on=True)
+                    for k, loss in gap_losses.items():
+                        mask_losses[k] = loss
+                return mask_losses
+            else:
+                proposal_boxes = [x.proposal_boxes for x in proposals]
+                mask_features = self.mask_pooler(features, proposal_boxes)
+                return self.mask_head(mask_features, proposals)
         else:
             pred_boxes = [x.pred_boxes for x in instances]
             mask_features = self.mask_pooler(features, pred_boxes)
