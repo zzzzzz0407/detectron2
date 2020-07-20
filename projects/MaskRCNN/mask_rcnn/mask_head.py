@@ -66,7 +66,7 @@ def mask_rcnn_loss_with_gap(pred_mask_logits, instances, vis_period=0):
         return pred_mask_logits.sum() * 0
     gt_classes = cat(gt_classes, dim=0)
 
-    gap_loss = F.cross_entropy(pred_mask_logits, gt_classes, reduction="mean")
+    gap_loss = 0.1 * F.cross_entropy(pred_mask_logits, gt_classes, reduction="mean")
 
     return gap_loss
 
