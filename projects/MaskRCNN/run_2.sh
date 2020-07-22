@@ -32,10 +32,10 @@ echo 'Finish Downloading Data.'
 # process.
 ######################################################
 URL=tcp://127.0.0.1:50002
-CONFIG_FILE=${CURDIR}/configs/zhang/mask_rcnn_R_50_FPN_1x_semi_mask_1.yaml
+CONFIG_FILE=${CURDIR}/configs/zhang/mask_rcnn_R_50_FPN_1x_semi_0.2.yaml
 GPU_NUM=4
-OUTPUT_DIR=${CURDIR}/models/mask_rcnn_R_50_FPN_1x_semi_mask_1
-HDFS_DIR=${HDFS_ROOT}/models/detectron2/semi/mask_rcnn_R_50_FPN_1x_semi_mask_1
+OUTPUT_DIR=${CURDIR}/models/mask_rcnn_R_50_FPN_1x_semi_0.2
+HDFS_DIR=${HDFS_ROOT}/models/detectron2/semi/mask_rcnn_R_50_FPN_1x_semi_0.2
 
 hdfs dfs -mkdir -p ${HDFS_DIR}
 

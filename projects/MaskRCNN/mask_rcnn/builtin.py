@@ -24,12 +24,20 @@ from detectron2.data import DatasetCatalog, MetadataCatalog
 from detectron2.data.datasets.coco import load_coco_json
 
 # ==== Predefined datasets and splits for COCO ==========
-_PREDEFINED_SPLITS_COCO = {}
+_PREDEFINED_SPLITS_COCO = dict()
 _PREDEFINED_SPLITS_COCO["coco"] = {
     "instances_train2017_semi_0.1_min_200": ("coco/train2017",
                                              "coco/annotations/semi/instances_train2017_semi_0.1_min_200.json"),
     "instances_val2017_semi_0.1_min_200": ("coco/val2017",
                                            "coco/annotations/semi/instances_val2017_semi_0.1_min_200.json"),
+    "instances_train2017_semi_0.2_min_200": ("coco/train2017",
+                                             "coco/annotations/semi/instances_train2017_semi_0.2_min_200.json"),
+    "instances_train2017_semi_0.5_min_200": ("coco/train2017",
+                                             "coco/annotations/semi/instances_train2017_semi_0.5_min_200.json"),
+    "instances_train2017_semi_0.05_min_200": ("coco/train2017",
+                                              "coco/annotations/semi/instances_train2017_semi_0.05_min_200.json"),
+    "instances_train2017_semi_0.01_min_100": ("coco/train2017",
+                                              "coco/annotations/semi/instances_train2017_semi_0.01_min_100.json"),
 }
 
 

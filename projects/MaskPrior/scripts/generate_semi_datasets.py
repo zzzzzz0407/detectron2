@@ -16,8 +16,8 @@ def parse_args():
     parser.add_argument('--out-dir', type=str,
                         default='semi',
                         help='the name of out dir.')
-    parser.add_argument('--ratio-semi', type=float, default=0.1)
-    parser.add_argument('--num-min', type=int, default=200)
+    parser.add_argument('--ratio-semi', type=float, default=0.01)
+    parser.add_argument('--num-min', type=int, default=100)
     args = parser.parse_args()
     return args
 

@@ -1,0 +1,15 @@
+_BASE_: "../Base-RCNN-FPN.yaml"
+MODEL:
+  WEIGHTS: "models/R-50.pkl"
+  MASK_ON: True
+  RESNETS:
+    DEPTH: 50
+  # Appended by Rufeng Zhang.
+  ROI_HEADS:
+    NAME: "SemiStandardROIHeads"
+  ROI_MASK_HEAD:
+    NAME: "SemiMaskRCNNConvUpsampleHead"
+  FLAG_SEMI: True
+DATASETS:
+  TRAIN: ("instances_train2017_semi_0.2_min_200",)
+  TEST: ("coco_2017_val",)
