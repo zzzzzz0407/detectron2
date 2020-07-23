@@ -31,7 +31,7 @@ echo 'Finish Downloading Data.'
 
 # process.
 ######################################################
-# URL=tcp://127.0.0.1:50001
+URL=tcp://127.0.0.1:50001
 CONFIG_FILE=${CURDIR}/configs/zhang/mask_rcnn_R_50_FPN_1x_semi_0.5.yaml
 GPU_NUM=4
 OUTPUT_DIR=${CURDIR}/models/mask_rcnn_R_50_FPN_1x_semi_0.5
