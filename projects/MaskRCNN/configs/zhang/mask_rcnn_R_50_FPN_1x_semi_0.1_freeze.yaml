@@ -1,0 +1,16 @@
+_BASE_: "../Base-RCNN-FPN.yaml"
+MODEL:
+  WEIGHTS: "models/faster_rcnn.pth"
+  MASK_ON: True
+  RESNETS:
+    DEPTH: 50
+  # Appended by Rufeng Zhang.
+  ROI_HEADS:
+    NAME: "SemiStandardROIHeads"
+  ROI_MASK_HEAD:
+    NAME: "SemiMaskRCNNConvUpsampleHead"
+  FLAG_SEMI: True
+  FREEZE_FASTER_RCNN: True
+DATASETS:
+  TRAIN: ("instances_train2017_semi_0.1_min_200",)
+  TEST: ("coco_2017_val",)

@@ -39,6 +39,7 @@ from detectron2.evaluation import (
 )
 from detectron2.modeling import GeneralizedRCNNWithTTA
 from mask_rcnn import add_extra_config, DatasetMapper
+from mask_rcnn import build_optimizer
 
 
 class Trainer(DefaultTrainer):
@@ -125,6 +126,17 @@ class Trainer(DefaultTrainer):
         dataloader for semi datasets.
         """
         return build_detection_train_loader(cfg, mapper=DatasetMapper(cfg, True))
+
+    @classmethod
+    def build_optimizer(cls, cfg, model):
+        """
+                Returns:
+                    torch.optim.Optimizer:
+
+                It now calls :func:`detectron2.solver.build_optimizer`.
+                Overwrite it if you'd like a different optimizer.
+                """
+        return build_optimizer(cfg, model)
 
 
 def setup(args):

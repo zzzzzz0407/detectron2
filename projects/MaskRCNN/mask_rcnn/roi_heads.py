@@ -98,6 +98,8 @@ class SemiStandardROIHeads(ROIHeads):
         keypoint_head: Optional[nn.Module] = None,
         train_on_pred_boxes: bool = False,
         flag_semi: bool = False,
+        flag_semi_on_loss: bool = False,
+        coeff_semi: float = 0.1,
         flag_gap: bool = False,
         with_mask_loss: bool = True,
         **kwargs
@@ -141,6 +143,8 @@ class SemiStandardROIHeads(ROIHeads):
 
         # appended by rufeng zhang.
         self.flag_semi = flag_semi
+        self.flag_semi_on_loss = flag_semi_on_loss
+        self.coeff_semi = coeff_semi
         self.flag_gap = flag_gap
         self.with_mask_loss = with_mask_loss
 
@@ -151,6 +155,8 @@ class SemiStandardROIHeads(ROIHeads):
 
         # appended by rufeng zhang.
         ret["flag_semi"] = cfg.MODEL.FLAG_SEMI
+        ret["flag_semi_on_loss"] = cfg.MODEL.FLAG_SEMI_ON_LOSS
+        ret["coeff_semi"] = cfg.MODEL.COEFF_SEMI
         ret["flag_gap"] = cfg.MODEL.FLAG_GAP
         ret["with_mask_loss"] = cfg.MODEL.ROI_MASK_HEAD.WITH_MASK_LOSS
 
@@ -397,6 +403,10 @@ class SemiStandardROIHeads(ROIHeads):
                     gap_losses = self.mask_head(gap_features, proposals_without_blinds, gap_on=True)
                     for k, loss in gap_losses.items():
                         mask_losses[k] = loss
+                if self.flag_semi_on_loss:
+                    for k, loss in mask_losses.items():
+                        mask_losses[k] = self.coeff_semi * loss
+
                 return mask_losses
             else:
                 proposal_boxes = [x.proposal_boxes for x in proposals]

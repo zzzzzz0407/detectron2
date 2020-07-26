@@ -13,5 +13,8 @@ def add_extra_config(cfg):
     # add for semi params.
     _C.MODEL.FLAG_SEMI = False
     _C.MODEL.FLAG_GAP = False
+    _C.MODEL.FLAG_SEMI_ON_LOSS = False
+    _C.MODEL.COEFF_SEMI = 0.1
     # add for mask head.
     _C.MODEL.ROI_MASK_HEAD.WITH_MASK_LOSS = True
+    _C.MODEL.FREEZE_FASTER_RCNN = False
