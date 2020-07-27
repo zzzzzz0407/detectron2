@@ -11,7 +11,7 @@ MODEL:
     NAME: "SemiMaskRCNNConvUpsampleHead"
   FLAG_SEMI: True
   # FLAG_SEMI_ON_LOSS: True
-  FREEZE_FASTER_RCNN: False
+  FREEZE_FASTER_RCNN: True
   COEFF_SEMI: 0.1
 DATASETS:
   TRAIN: ("instances_val2017_semi_0.1_min_200",)

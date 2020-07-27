@@ -34,8 +34,8 @@ echo 'Finish Downloading Data.'
 URL=tcp://127.0.0.1:50002
 CONFIG_FILE=${CURDIR}/configs/zhang/mask_rcnn_R_50_FPN_1x_semi_0.1_freeze.yaml
 GPU_NUM=4
-OUTPUT_DIR=${CURDIR}/models/mask_rcnn_R_50_FPN_1x_semi_0.1_freeze
-HDFS_DIR=${HDFS_ROOT}/models/detectron2/semi/mask_rcnn_R_50_FPN_1x_semi_0.1_freeze
+OUTPUT_DIR=${CURDIR}/models/mask_rcnn_R_50_FPN_1x_semi_0.1_freeze_faster_rcnn
+HDFS_DIR=${HDFS_ROOT}/models/detectron2/semi/mask_rcnn_R_50_FPN_1x_semi_0.1_freeze_faster_rcnn
 
 hdfs dfs -mkdir -p ${HDFS_DIR}
 

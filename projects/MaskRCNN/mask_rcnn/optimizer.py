@@ -153,6 +153,11 @@ def build_optimizer(cfg: CfgNode, model: torch.nn.Module) -> torch.optim.Optimiz
                 weight_decay = cfg.SOLVER.WEIGHT_DECAY_BIAS
 
             # freeze faster rcnn.
+            if "backbone" in key or "proposal_generator" in key \
+                    or "box_head" in key or "box_predictor" in key:
+                value.requires_grad = False
+
+            # only the params in mask head are updated.
             if "mask_head" in key:
                 params += [{"params": [value], "lr": lr, "weight_decay": weight_decay}]
 

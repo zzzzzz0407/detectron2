@@ -22,7 +22,7 @@ HDFS_ROOT=hdfs://haruna/home/byte_arnold_lq_mlnlc/user/zhangrufeng/
 mkdir -p ${CURDIR}/datasets/coco
 mkdir -p ${CURDIR}/models
 echo 'Start Downloading Data.'
-hadoop fs -get ${HDFS_ROOT}/pretrained/detectron2/R-50.pkl ${CURDIR}/models
+hadoop fs -get ${HDFS_ROOT}/pretrained/detectron2/X-101-64x4d.pkl ${CURDIR}/models
 hadoop fs -get ${HDFS_ROOT}/datasets/lvis ${CURDIR}/datasets/
 hadoop fs -get ${HDFS_ROOT}/datasets/coco/val2017.zip ${CURDIR}/datasets/coco
 hadoop fs -get ${HDFS_ROOT}/datasets/coco/train2017.zip ${CURDIR}/datasets/coco
@@ -31,10 +31,10 @@ echo 'Finish Downloading Data.'
 
 # process.
 ######################################################
-CONFIG_FILE=${CURDIR}/configs/zhang/SOLOv2_R50_800_1x_lvis.yaml
+CONFIG_FILE=${CURDIR}/configs/zhang/SOLOv2_X101_64x4d_800_3x_lvis.yaml
 GPU_NUM=8
-OUTPUT_DIR=${CURDIR}/models/SOLOv2_R50_800_1x_lvis
-HDFS_DIR=${HDFS_ROOT}/models/solov2/SOLOv2_R50_800_1x_lvis
+OUTPUT_DIR=${CURDIR}/models/SOLOv2_X101_64x4d_800_3x_lvis
+HDFS_DIR=${HDFS_ROOT}/models/solov2/SOLOv2_X101_64x4d_800_3x_lvis
 
 hdfs dfs -mkdir -p ${HDFS_DIR}
 

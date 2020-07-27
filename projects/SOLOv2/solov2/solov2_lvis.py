@@ -19,8 +19,8 @@ from fvcore.nn import sigmoid_focal_loss_jit
 
 from .utils import imrescale
 from .loss import dice_loss, FocalLoss
-#from detectron2.layers.DFConv2d import DFConv2d
-#from IPython import embed
+from .deform_conv import DFConv2d
+# from IPython import embed
 
 
 __all__ = ["SOLOv2_LVIS"]
@@ -648,7 +648,7 @@ class SOLOv2InsHead(nn.Module):
             tower = []
             num_convs, use_deformable, use_coord = head_configs[head]
             for i in range(num_convs):
-                if use_deformable and i == num_convs - 1:
+                if use_deformable:
                     if self.type_dcn == "DCN":
                         conv_func = DFConv2d
                     else:
@@ -667,7 +667,7 @@ class SOLOv2InsHead(nn.Module):
                 tower.append(conv_func(
                         chn, self.instance_channels,
                         kernel_size=3, stride=1,
-                        padding=1, bias=norm is None
+                        padding=1, bias=True
                 ))
                 if norm == "GN":
                     tower.append(nn.GroupNorm(32, self.instance_channels))
