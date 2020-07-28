@@ -1,0 +1,34 @@
+_BASE_: "../Base-SOLOv2.yaml"
+MODEL:
+  META_ARCHITECTURE: "SOLOv2_LVIS"
+  WEIGHTS: "models/X-152-32x8d-IN5k.pkl"
+  PIXEL_STD: [1.0, 1.0, 1.0]
+  RESNETS:
+    STRIDE_IN_1X1: False  # this is a C2 model
+    NUM_GROUPS: 32
+    WIDTH_PER_GROUP: 8
+    DEPTH: 152
+    DEFORM_ON_PER_STAGE: [False, True, True, True]
+    DEFORM_MODULATED: True
+  SOLOV2:
+    NUM_CLASSES: 1203
+    NUM_GRIDS: [60, 44, 32, 20, 10]
+    NUM_INSTANCE_CONVS: 4
+    USE_DCN_IN_INSTANCE: True
+    # post-process.
+    NMS_TYPE: "matrix"
+    NMS_PRE: 2000
+    SCORE_THR: 0.05
+    UPDATE_THR: 0.0025
+    MAX_PER_IMG: 300
+SOLVER:
+  WARMUP_ITERS: 2000
+  STEPS: (120000, 160000)
+  MAX_ITER: 180000
+DATASETS:
+  TRAIN: ("lvis_v1_train",)
+  # TRAIN: ("lvis_v1_val",)
+  TEST: ("lvis_v1_val",)
+DATALOADER:
+  SAMPLER_TRAIN: "RepeatFactorTrainingSampler"
+  REPEAT_THRESHOLD: 0.001
