@@ -26,8 +26,8 @@ SOLVER:
   STEPS: (180000, 240000)
   MAX_ITER: 270000
 DATASETS:
-  TRAIN: ("lvis_v1_train",)
-  # TRAIN: ("lvis_v1_val",)
+  # TRAIN: ("lvis_v1_train",)
+  TRAIN: ("lvis_v1_val",)
   TEST: ("lvis_v1_val",)
 DATALOADER:
   SAMPLER_TRAIN: "RepeatFactorTrainingSampler"

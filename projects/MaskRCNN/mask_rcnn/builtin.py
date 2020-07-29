@@ -38,6 +38,13 @@ _PREDEFINED_SPLITS_COCO["coco"] = {
                                               "coco/annotations/semi/instances_train2017_semi_0.05_min_200.json"),
     "instances_train2017_semi_0.01_min_100": ("coco/train2017",
                                               "coco/annotations/semi/instances_train2017_semi_0.01_min_100.json"),
+    # categories.
+    "instances_train2017_semi_0.1_min_200_person": ("coco/train2017",
+                                                    "coco/annotations/semi/"
+                                                    "instances_train2017_semi_0.1_min_200_person.json"),
+    "instances_val2017_semi_0.1_min_200_person": ("coco/val2017",
+                                                  "coco/annotations/semi/"
+                                                  "instances_val2017_semi_0.1_min_200_person.json"),
 }
 
 

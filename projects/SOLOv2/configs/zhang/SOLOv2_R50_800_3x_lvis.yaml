@@ -1,5 +1,6 @@
 _BASE_: "../Base-SOLOv2.yaml"
 MODEL:
+  META_ARCHITECTURE: "SOLOv2_LVIS"
   WEIGHTS: "models/R-50.pkl"
   RESNETS:
     DEPTH: 50
