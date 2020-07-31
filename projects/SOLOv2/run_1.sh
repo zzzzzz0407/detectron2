@@ -18,7 +18,7 @@ echo 'The work dir is: ' ${CURDIR}
 
 # data.
 ######################################################
-HDFS_ROOT=hdfs://haruna/home/byte_arnold_hl_mlnlc/user/zhangrufeng/
+HDFS_ROOT=hdfs://haruna/home/byte_arnold_lq_mlnlc/user/zhangrufeng/
 mkdir -p ${CURDIR}/datasets/coco
 mkdir -p ${CURDIR}/models
 echo 'Start Downloading Data.'
@@ -31,10 +31,10 @@ echo 'Finish Downloading Data.'
 
 # process.
 ######################################################
-CONFIG_FILE=${CURDIR}/configs/zhang/SOLOv2_R50_800_3x_semi.yaml
-GPU_NUM=8
-OUTPUT_DIR=${CURDIR}/models/SOLOv2_R50_800_3x_semi
-HDFS_DIR=${HDFS_ROOT}/models/solov2/SOLOv2_R50_800_3x_semi
+CONFIG_FILE=${CURDIR}/configs/zhang/SOLOv2_R50_800_1x.yaml
+GPU_NUM=4
+OUTPUT_DIR=${CURDIR}/models/SOLOv2_R50_800_1x_4gpu
+HDFS_DIR=${HDFS_ROOT}/models/solov2/SOLOv2_R50_800_1x_4gpu
 
 hdfs dfs -mkdir -p ${HDFS_DIR}
 
