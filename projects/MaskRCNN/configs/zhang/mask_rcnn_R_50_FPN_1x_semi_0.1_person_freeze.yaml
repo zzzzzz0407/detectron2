@@ -1,6 +1,6 @@
 _BASE_: "../Base-RCNN-FPN.yaml"
 MODEL:
-  WEIGHTS: "models/faster_rcnn_person.pth" # "models/R-50.pkl"  #"models/faster_rcnn.pth" #
+  WEIGHTS: "models/faster_rcnn_person.pth"  #"models/faster_rcnn.pth"
   MASK_ON: True
   RESNETS:
     DEPTH: 50
@@ -14,5 +14,5 @@ MODEL:
   FLAG_SEMI: True
   FREEZE_FASTER_RCNN: True
 DATASETS:
-  TRAIN: ("instances_val2017_semi_0.1_min_200_person",)
+  TRAIN: ("instances_train2017_semi_0.1_min_200_person",)
   TEST: ("coco_2017_val",)
