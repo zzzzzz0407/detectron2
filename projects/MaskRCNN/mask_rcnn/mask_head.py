@@ -215,7 +215,7 @@ class BaseMaskRCNNHead(nn.Module):
     def from_config(cls, cfg, input_shape):
         return {"vis_period": cfg.VIS_PERIOD}
 
-    def forward(self, x, instances: List[Instances], gap_on=False):
+    def forward(self, x, instances: List[Instances], gap_on=False, return_pred=False):
         """
         Args:
             x: input region feature(s) provided by :class:`ROIHeads`.
@@ -231,7 +231,9 @@ class BaseMaskRCNNHead(nn.Module):
         """
         x = self.layers(x)
         if self.training:
-            if gap_on:
+            if return_pred:
+                return x
+            elif gap_on:
                 x = self.gap(x)
                 return {"loss_gap": mask_rcnn_loss_with_gap(x, instances, self.vis_period)}
             else:

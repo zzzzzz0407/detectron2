@@ -1,0 +1,23 @@
+_BASE_: "../Base-RCNN-FPN.yaml"
+MODEL:
+  WEIGHTS: "models/faster_rcnn_person.pth"  #"models/faster_rcnn.pth"
+  MASK_ON: True
+  RESNETS:
+    DEPTH: 50
+  # Appended by Rufeng Zhang.
+  ROI_HEADS:
+    NAME: "SemiStandardROIHeads"
+    NUM_CLASSES: 1
+  ROI_MASK_HEAD:
+    NAME: "SemiMaskRCNNConvUpsampleHead"
+    # WITH_MASK_LOSS: False
+  FLAG_SEMI: True
+  FREEZE_FASTER_RCNN: True
+  WITH_GAN: True
+  COEFF_GAN: 0.05
+  WEIGHTS_GAN: "models/person_hingeloss_435.pth"
+  # FLAG_SEMI_ON_LOSS: True
+  # COEFF_SEMI: 0.
+DATASETS:
+  TRAIN: ("instances_train2017_semi_0.1_min_200_person",)
+  TEST: ("coco_2017_val",)

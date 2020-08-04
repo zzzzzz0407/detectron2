@@ -59,3 +59,6 @@ def add_solov2_config(cfg):
     # Optional Params.
     cfg.MODEL.SOLOV2.FLAG_SEMI = False
     cfg.MODEL.SOLOV2.RATIO_SEMI = 0.1
+
+    # debug.
+    cfg.MODEL.SOLOV2.FLAG_EDGE = False

@@ -5,6 +5,7 @@ import numpy as np
 from typing import Dict, List, Optional, Tuple, Union
 import torch
 from torch import nn
+import torch.nn.functional as F
 
 from detectron2.config import configurable
 from detectron2.layers import ShapeSpec, nonzero_tuple
@@ -21,6 +22,7 @@ from detectron2.modeling.roi_heads.box_head import build_box_head
 from detectron2.modeling.roi_heads.fast_rcnn import FastRCNNOutputLayers
 from detectron2.modeling.roi_heads.keypoint_head import build_keypoint_head
 from .mask_head import build_mask_head
+from .utils import Discriminator
 
 logger = logging.getLogger(__name__)
 
@@ -102,6 +104,10 @@ class SemiStandardROIHeads(ROIHeads):
         coeff_semi: float = 0.1,
         flag_gap: bool = False,
         with_mask_loss: bool = True,
+        with_gan: bool = False,
+        coeff_gan: float = 0.1,
+        discriminator: nn.Module,
+        discriminator_weigths: str = "",
         **kwargs
     ):
         """
@@ -147,6 +153,12 @@ class SemiStandardROIHeads(ROIHeads):
         self.coeff_semi = coeff_semi
         self.flag_gap = flag_gap
         self.with_mask_loss = with_mask_loss
+        self.with_gan = with_gan
+        self.coeff_gan = coeff_gan
+        if self.with_gan:
+            self.discriminator = discriminator
+            self.discriminator_weigths = discriminator_weigths
+            self.flag_weights = True
 
     @classmethod
     def from_config(cls, cfg, input_shape):
@@ -159,6 +171,9 @@ class SemiStandardROIHeads(ROIHeads):
         ret["coeff_semi"] = cfg.MODEL.COEFF_SEMI
         ret["flag_gap"] = cfg.MODEL.FLAG_GAP
         ret["with_mask_loss"] = cfg.MODEL.ROI_MASK_HEAD.WITH_MASK_LOSS
+        ret["with_gan"] = cfg.MODEL.WITH_GAN
+        ret["coeff_gan"] = cfg.MODEL.COEFF_GAN
+        ret["discriminator_weigths"] = cfg.MODEL.WEIGHTS_GAN
 
         # Subclasses that have not been updated to use from_config style construction
         # may have overridden _init_*_head methods. In this case, those overridden methods
@@ -234,6 +249,11 @@ class SemiStandardROIHeads(ROIHeads):
         ret["mask_head"] = build_mask_head(
             cfg, ShapeSpec(channels=in_channels, width=pooler_resolution, height=pooler_resolution)
         )
+
+        if cfg.MODEL.WITH_GAN:
+            ret["discriminator"] = Discriminator()
+        else:
+            ret["discriminator"] = None
         return ret
 
     @classmethod
@@ -403,10 +423,32 @@ class SemiStandardROIHeads(ROIHeads):
                     gap_losses = self.mask_head(gap_features, proposals_without_blinds, gap_on=True)
                     for k, loss in gap_losses.items():
                         mask_losses[k] = loss
-                if self.flag_semi_on_loss:
-                    for k, loss in mask_losses.items():
-                        mask_losses[k] = self.coeff_semi * loss
+                if self.with_gan:
+                    if self.flag_weights:
+                        import os
+                        import collections
+                        cwd = os.getcwd()
+                        checkpoints = os.path.join(cwd, self.discriminator_weigths)
+                        checkpoints = torch.load(checkpoints)
+                        checkpoints = collections.OrderedDict([('.'.join(x.split('.')[1:]), y) if 'module' in x
+                                                               else (x, y) for x, y in checkpoints.items()])
+                        self.discriminator.load_state_dict(checkpoints, strict=False)
+                        self.flag_weights = False
+                    # for those without mask labels.
+                    gap_boxes = [x.proposal_boxes for x in proposals_without_blinds]
+                    gap_features = self.mask_pooler(features, gap_boxes)
+                    gap_predicitions = self.mask_head(gap_features, proposals_without_blinds, return_pred=True)
+                    gap_predicitions = gap_predicitions.sigmoid()
+                    gap_predicitions = F.interpolate(gap_predicitions, size=(64, 64), mode='bilinear', align_corners=False)
+                    gap_predicitions = self.discriminator(gap_predicitions)
+                    errG = -gap_predicitions.mean()
+                    errG = self.coeff_gan * errG
+                    mask_losses['loss_gan'] = errG
 
+                if self.flag_semi_on_loss:
+                    # for k, loss in mask_losses.items():
+                    #                mask_losses[k] = self.coeff_semi * loss
+                    mask_losses['loss_mask'] = self.coeff_semi * mask_losses['loss_mask']
                 return mask_losses
             else:
                 proposal_boxes = [x.proposal_boxes for x in proposals]

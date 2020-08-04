@@ -6,6 +6,7 @@ from .roi_heads import SemiStandardROIHeads
 from . import builtin  # ensure the builtin datasets are registered
 from .dataset_mapper import DatasetMapper
 from .optimizer import build_optimizer
+from .utils import Discriminator
 
 __all__ = [k for k in globals().keys() if not k.startswith("_")]
 

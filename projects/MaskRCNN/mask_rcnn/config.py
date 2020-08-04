@@ -18,3 +18,6 @@ def add_extra_config(cfg):
     # add for mask head.
     _C.MODEL.ROI_MASK_HEAD.WITH_MASK_LOSS = True  # mask loss = 0 --> faster rcnn.
     _C.MODEL.FREEZE_FASTER_RCNN = False  # freeze faster rcnn.
+    _C.MODEL.WITH_GAN = False
+    _C.MODEL.COEFF_GAN = 0.1
+    _C.MODEL.WEIGHTS_GAN = ""
