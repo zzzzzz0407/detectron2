@@ -106,7 +106,7 @@ class SemiStandardROIHeads(ROIHeads):
         with_mask_loss: bool = True,
         with_gan: bool = False,
         coeff_gan: float = 0.1,
-        discriminator: nn.Module,
+        # discriminator: nn.Module,
         discriminator_weigths: str = "",
         **kwargs
     ):
@@ -159,6 +159,8 @@ class SemiStandardROIHeads(ROIHeads):
             self.discriminator = discriminator
             self.discriminator_weigths = discriminator_weigths
             self.flag_weights = True
+        else:
+            self.discriminator = None
 
     @classmethod
     def from_config(cls, cfg, input_shape):
