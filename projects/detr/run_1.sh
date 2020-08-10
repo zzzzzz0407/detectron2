@@ -21,7 +21,7 @@ echo 'Finish building.'
 HDFS_ROOT=hdfs://haruna/home/byte_arnold_lq_mlnlc/user/zhangrufeng/
 mkdir -p ${CURDIR}/datasets/crowdhuman
 mkdir -p ${CURDIR}/checkpoints
-echo 'Start Downloading Data.'a
+echo 'Start Downloading Data.'
 hadoop fs -get ${HDFS_ROOT}/pretrained/detr/torchvision-R-50_double_stems.pkl ${CURDIR}/checkpoints
 hadoop fs -get ${HDFS_ROOT}/datasets/crowdhuman/annotations ${CURDIR}/datasets/crowdhuman
 hadoop fs -get ${HDFS_ROOT}/datasets/crowdhuman/CrowdHuman_val.zip ${CURDIR}/datasets/crowdhuman
