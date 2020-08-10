@@ -7,11 +7,11 @@ cd ${CURDIR}
 echo 'The work dir is: ' ${CURDIR}
 
 # build if needed.
-# hadoop fs -get ${HDFS_ROOT}/build/detectron2/build.tar.gz ${CURDIR}
-# tar -xzvf ${CURDIR}/build.tar.gz
-# echo 'Start building.'
-# sudo python3 ${CURDIR}/setup.py build develop
-# echo 'Finish building.'
+echo 'Start building.'
+cd ${CURDIR}/../../
+sudo python3 ./setup.py build develop
+cd ${CURDIR}
+echo 'Finish building.'
 
 # pip install if needed.
 ######################################################
@@ -31,7 +31,7 @@ echo 'Finish Downloading Data.'
 
 # process.
 ######################################################
-URL=tcp://127.0.0.1:50002
+URL=tcp://127.0.0.1:50001
 CONFIG_FILE=${CURDIR}/configs/zhang/crowdhuman_baseline.yaml
 GPU_NUM=4
 OUTPUT_DIR=${CURDIR}/checkpoints/crowdhuman_baseline
