@@ -13,7 +13,7 @@ MODEL:
     # WITH_MASK_LOSS: False
   FLAG_SEMI: True
   FREEZE_FASTER_RCNN: True
-  WITH_GAN: True
+  WITH_GAN: False
   COEFF_GAN: 0.05
   WEIGHTS_GAN: "models/person_hingeloss_435.pth"
   FLAG_SEMI_ON_LOSS: True
