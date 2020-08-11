@@ -32,10 +32,10 @@ echo 'Finish Downloading Data.'
 # process.
 ######################################################
 URL=tcp://127.0.0.1:50001
-CONFIG_FILE=${CURDIR}/configs/zhang/crowdhuman_baseline.yaml
-GPU_NUM=4
-OUTPUT_DIR=${CURDIR}/checkpoints/crowdhuman_baseline
-HDFS_DIR=${HDFS_ROOT}/models/detr/crowdhuman_baseline
+CONFIG_FILE=${CURDIR}/configs/zhang/debug_arnold.yaml
+GPU_NUM=2
+OUTPUT_DIR=${CURDIR}/checkpoints/debug_arnold
+HDFS_DIR=${HDFS_ROOT}/models/detr/debug_arnold
 
 hdfs dfs -mkdir -p ${HDFS_DIR}
 

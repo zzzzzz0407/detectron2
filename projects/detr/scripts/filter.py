@@ -3,7 +3,7 @@ import json
 import os
 
 if __name__ == '__main__':
-    jsonFile = '/data00/home/zhangrufeng1/datasets/crowdhuman/annotations/train.json'
+    jsonFile = '/data00/home/zhangrufeng1/datasets/crowdhuman/annotations/val.json'
     dataPath, nameFile = os.path.split(jsonFile)
     jsonFile_filter = os.path.join(dataPath, 'CrowdHuman_{}'.format(nameFile))
     with open(jsonFile, 'r') as f:
