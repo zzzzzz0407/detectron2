@@ -6,6 +6,11 @@ if __name__ == '__main__':
         infos = json.load(f)
 
     count_dict = dict()
+    for info in infos["images"]:
+        if info["file_name"] in ["MOT17-02-FRCNN/img1/000091.jpg"]:
+
+
+
     for ann in infos['annotations']:
         if ann["image_id"] not in count_dict.keys() and ann["iscrowd"] == 0 and ann["bbox"][2] >= 1e-5 and ann["bbox"][3] >= 1e-5:
             count_dict[ann["image_id"]] = 1

@@ -30,6 +30,10 @@ def add_detr_config(cfg):
     cfg.SOLVER.OPTIMIZER = "ADAMW"
     cfg.SOLVER.BACKBONE_MULTIPLIER = 0.1
 
-    # others.
+    # Track.
     cfg.INPUT.ZIP_READ = False
     cfg.MODEL.DETR.INDEX_FEEDFORWARD = -1
+    cfg.MODEL.DETR.MAX_FRAME_DIST = 3
+    cfg.MODEL.DETR.TRACK_ON = False
+    cfg.MODEL.DETR.TRACK_WEIGHT = 1.0
+    cfg.MODEL.DETR.TRACK_AUG = False

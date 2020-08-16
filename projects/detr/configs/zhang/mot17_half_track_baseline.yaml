@@ -2,7 +2,7 @@ MODEL:
   META_ARCHITECTURE: "DetrTrack"
   BACKBONE:
     NAME: "build_two_stem_resnet_backbone"
-  WEIGHTS: "checkpoints/crowdhuman_baseline.pth"
+  WEIGHTS: "checkpoints/torchvision-R-50_double_stems.pkl"
   PIXEL_MEAN: [123.675, 116.280, 103.530]
   PIXEL_STD: [58.395, 57.120, 57.375]
   MASK_ON: False
@@ -24,12 +24,12 @@ MODEL:
     TRACK_AUG: True
 DATASETS:
   TRAIN: ("mot17_train_half",)
-  TEST: ("CrowdHuman_val",)
+  TEST: ("mot17_val_half",)
 SOLVER:
-  IMS_PER_BATCH: 2
+  IMS_PER_BATCH: 8 # 8cur + 8pre.
   BASE_LR: 0.0001
-  STEPS: (200000,)
-  MAX_ITER: 300000
+  STEPS: (80000,)
+  MAX_ITER: 120000
   WARMUP_FACTOR: 1.0
   WARMUP_ITERS: 10
   WEIGHT_DECAY: 0.0001
@@ -49,8 +49,8 @@ INPUT:
   FORMAT: "RGB"  # --> 默认是bgr.
   ZIP_READ: True
 TEST:
-  EVAL_PERIOD: 4000
+  EVAL_PERIOD: 0
 DATALOADER:
   FILTER_EMPTY_ANNOTATIONS: False
-  NUM_WORKERS: 4
+  NUM_WORKERS: 16
 VERSION: 2

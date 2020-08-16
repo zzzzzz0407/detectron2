@@ -12,13 +12,13 @@ from util.misc import (NestedTensor, nested_tensor_from_tensor_list,
                        is_dist_avail_and_initialized)
 
 from .backbone import build_backbone
-from .matcher import build_matcher
+from .matcher import build_matcher, build_track_matcher
 from .segmentation import (DETRsegm, PostProcessPanoptic, PostProcessSegm,
                            dice_loss, sigmoid_focal_loss)
 from .transformer import build_transformer
 
 
-class DETR(nn.Module):
+class DETRTRACK(nn.Module):
     """ This is the DETR module that performs object detection """
     def __init__(self, backbone, transformer, num_classes, num_queries, aux_loss=False, cfg=None):
         """ Initializes the model.
@@ -47,7 +47,7 @@ class DETR(nn.Module):
         if self.track_on:
             self.track_embed = nn.Linear(hidden_dim, 1)
 
-    def forward(self, samples: NestedTensor):
+    def forward(self, samples: NestedTensor, pre_embed=None):
         """ The forward expects a NestedTensor, which consists of:
                - samples.tensor: batched images, of shape [batch_size x 3 x H x W]
                - samples.mask: a binary mask of shape [batch_size x H x W], containing 1 on padded pixels
@@ -64,12 +64,21 @@ class DETR(nn.Module):
         """
         if isinstance(samples, (list, torch.Tensor)):
             samples = nested_tensor_from_tensor_list(samples)
-        features, pos = self.backbone(samples)
 
+        # detection only.
+        if self.track_on and pre_embed is None:
+            samples.tensor = samples.tensor[:, 3:, :, :]  # det on pre frame.
+
+        # backbone features.
+        features, pos = self.backbone(samples)
         src, mask = features[self.index_feedforward].decompose()
         assert mask is not None
-        hs = self.transformer(self.input_proj(src), mask, self.query_embed.weight, pos[self.index_feedforward])[0]
 
+        # embedding features.
+        hs = self.transformer(self.input_proj(src), mask, self.query_embed.weight,
+                              pos[self.index_feedforward], tgt=pre_embed)[0]
+
+        # individual branch.
         outputs_class = self.class_embed(hs)
         outputs_coord = self.bbox_embed(hs).sigmoid()
         out = {'pred_logits': outputs_class[-1], 'pred_boxes': outputs_coord[-1]}
@@ -79,7 +88,11 @@ class DETR(nn.Module):
             out['pred_tracks'] = outputs_track[-1]
         if self.aux_loss:
             out['aux_outputs'] = self._set_aux_loss(outputs_class, outputs_coord, outputs_track)
-        return out
+
+        # pre embed.
+        pre_embed = hs[-1].detach()
+
+        return out, pre_embed
 
     @torch.jit.unused
     def _set_aux_loss(self, outputs_class, outputs_coord, outputs_track=None):
@@ -100,7 +113,7 @@ class SetCriterion(nn.Module):
         1) we compute hungarian assignment between ground truth boxes and the outputs of the model
         2) we supervise each pair of matched ground-truth / prediction (supervise class and box)
     """
-    def __init__(self, num_classes, matcher, weight_dict, eos_coef, losses):
+    def __init__(self, num_classes, matcher, track_matcher, weight_dict, eos_coef, losses):
         """ Create the criterion.
         Parameters:
             num_classes: number of object categories, omitting the special no-object category
@@ -112,6 +125,7 @@ class SetCriterion(nn.Module):
         super().__init__()
         self.num_classes = num_classes
         self.matcher = matcher
+        self.track_matcher = track_matcher
         self.weight_dict = weight_dict
         self.eos_coef = eos_coef
         self.losses = losses
@@ -125,9 +139,17 @@ class SetCriterion(nn.Module):
         """
         assert 'pred_logits' in outputs
         src_logits = outputs['pred_logits']
+        size_indices = len(indices[0])
 
         idx = self._get_src_permutation_idx(indices)
-        target_classes_o = torch.cat([t["labels"][J] for t, (_, J) in zip(targets, indices)])
+
+        if size_indices == 2:
+            target_classes_o = torch.cat([t["labels"][J] for t, (_, J) in zip(targets, indices)])
+        elif size_indices == 3:
+            target_classes_o = torch.cat([t["labels"][J] for t, (_, J, _) in zip(targets, indices)])
+        else:
+            raise NotImplementedError
+
         target_classes = torch.full(src_logits.shape[:2], self.num_classes,
                                     dtype=torch.int64, device=src_logits.device)
         target_classes[idx] = target_classes_o
@@ -161,8 +183,15 @@ class SetCriterion(nn.Module):
         """
         assert 'pred_boxes' in outputs
         idx = self._get_src_permutation_idx(indices)
+        size_indices = len(indices[0])
+
         src_boxes = outputs['pred_boxes'][idx]
-        target_boxes = torch.cat([t['boxes'][i] for t, (_, i) in zip(targets, indices)], dim=0)
+        if size_indices == 2:
+            target_boxes = torch.cat([t['boxes'][i] for t, (_, i) in zip(targets, indices)], dim=0)
+        elif size_indices == 3:
+            target_boxes = torch.cat([t['boxes'][i] for t, (_, i, _) in zip(targets, indices)], dim=0)
+        else:
+            raise NotImplementedError
 
         loss_bbox = F.l1_loss(src_boxes, target_boxes, reduction='none')
 
@@ -204,16 +233,66 @@ class SetCriterion(nn.Module):
         }
         return losses
 
-    def _get_src_permutation_idx(self, indices):
+    def loss_tracks(self, outputs, targets, indices, num_boxes):
+        """Compute the losses related to the bounding boxes, the L1 regression loss and the GIoU loss
+           targets dicts must contain the key "boxes" containing a tensor of dim [nb_target_boxes, 4]
+           The target boxes are expected in format (center_x, center_y, h, w), normalized by the image size.
+        """
+        assert 'pred_tracks' in outputs
+        # pred.
+        idx_pos = self._get_src_permutation_idx(indices)
+        pos_tracks = outputs['pred_tracks'][idx_pos]
+        idx_neg = self._get_track_neg_permutation_idx(indices)
+        neg_tracks = outputs['pred_tracks'][idx_neg]
+        src_tracks = torch.cat((pos_tracks, neg_tracks), dim=0)
+        # target.
+        target_tracks_pos = torch.cat([t['binary_tracks'][i] for t, (_, i, _) in zip(targets, indices)], dim=0)
+        target_tracks_neg = target_tracks_pos.new_zeros(len(idx_neg[0]))
+        target_tracks = torch.cat((target_tracks_pos, target_tracks_neg), dim=0).unsqueeze(1)
+        # loss.
+        loss_track = F.binary_cross_entropy_with_logits(src_tracks, target_tracks, reduction='none')
+        loss_track = loss_track.sum() / num_boxes
+        losses = {'loss_track': loss_track}
+
+        return losses
+
+    @staticmethod
+    def _get_src_permutation_idx(indices):
         # permute predictions following indices
-        batch_idx = torch.cat([torch.full_like(src, i) for i, (src, _) in enumerate(indices)])
-        src_idx = torch.cat([src for (src, _) in indices])
+        size_indices = len(indices[0])
+        if size_indices == 2:
+            batch_idx = torch.cat([torch.full_like(src, i) for i, (src, _) in enumerate(indices)])
+            src_idx = torch.cat([src for (src, _) in indices])
+        elif size_indices == 3:
+            batch_idx = torch.cat([torch.full_like(src, i) for i, (src, _, neg) in enumerate(indices)])
+            src_idx = torch.cat([src for (src, _, neg) in indices])
+        else:
+            raise NotImplementedError
         return batch_idx, src_idx
 
-    def _get_tgt_permutation_idx(self, indices):
+    @staticmethod
+    def _get_track_neg_permutation_idx(indices):
+        # permute predictions following indices
+        size_indices = len(indices[0])
+        if size_indices == 3:
+            batch_idx = torch.cat([torch.full_like(neg, i) for i, (src, _, neg) in enumerate(indices)])
+            src_idx = torch.cat([neg for (src, _, neg) in indices])
+        else:
+            raise NotImplementedError
+        return batch_idx, src_idx
+
+    @staticmethod
+    def _get_tgt_permutation_idx(indices):
         # permute targets following indices
-        batch_idx = torch.cat([torch.full_like(tgt, i) for i, (_, tgt) in enumerate(indices)])
-        tgt_idx = torch.cat([tgt for (_, tgt) in indices])
+        size_indices = len(indices[0])
+        if size_indices == 2:
+            batch_idx = torch.cat([torch.full_like(tgt, i) for i, (_, tgt) in enumerate(indices)])
+            tgt_idx = torch.cat([tgt for (_, tgt) in indices])
+        elif size_indices == 3:
+            batch_idx = torch.cat([torch.full_like(tgt, i) for i, (_, tgt, neg) in enumerate(indices)])
+            tgt_idx = torch.cat([tgt for (_, tgt, neg) in indices])
+        else:
+            raise NotImplementedError
         return batch_idx, tgt_idx
 
     def get_loss(self, loss, outputs, targets, indices, num_boxes, **kwargs):
@@ -221,12 +300,13 @@ class SetCriterion(nn.Module):
             'labels': self.loss_labels,
             'cardinality': self.loss_cardinality,
             'boxes': self.loss_boxes,
-            'masks': self.loss_masks
+            'masks': self.loss_masks,
+            'tracks': self.loss_tracks
         }
         assert loss in loss_map, f'do you really want to compute {loss} loss?'
         return loss_map[loss](outputs, targets, indices, num_boxes, **kwargs)
 
-    def forward(self, outputs, targets):
+    def forward(self, outputs, targets, indices_track=None, track_on=False):
         """ This performs the loss computation.
         Parameters:
              outputs: dict of tensors, see the output specification of the model for the format
@@ -235,38 +315,74 @@ class SetCriterion(nn.Module):
         """
         outputs_without_aux = {k: v for k, v in outputs.items() if k != 'aux_outputs'}
 
-        # Retrieve the matching between the outputs of the last layer and the targets
-        indices = self.matcher(outputs_without_aux, targets)
+        if track_on:
+            track_exists = "pred_tracks" in outputs_without_aux.keys()
+            assert track_exists is True
+            # Track Match.
+            indices_track, targets = self.track_matcher(outputs_without_aux, targets,
+                                                        indices_track=indices_track)
+            # Compute the average number of target boxes accross all nodes, for normalization purposes
+            num_boxes = sum(len(t["labels"]) for t in targets)
+            num_boxes = torch.as_tensor([num_boxes], dtype=torch.float, device=next(iter(outputs.values())).device)
+            if is_dist_avail_and_initialized():
+                torch.distributed.all_reduce(num_boxes)
+            num_boxes = torch.clamp(num_boxes / get_world_size(), min=1).item()
+            # Compute all the requested losses
+            losses = {}
+            losses_type = self.losses + ['tracks']
+            for loss in losses_type:
+                losses.update(self.get_loss(loss, outputs, targets, indices_track, num_boxes))
+            # In case of auxiliary losses, we repeat this process with the output of each intermediate layer.
+            if 'aux_outputs' in outputs:
+                for i, aux_outputs in enumerate(outputs['aux_outputs']):
+                    assert track_exists is True
+                    for loss in losses_type:
+                        if loss == 'masks':
+                            # Intermediate masks losses are too costly to compute, we ignore them.
+                            continue
+                        kwargs = {}
+                        if loss == 'labels':
+                            # Logging is enabled only for the last layer
+                            kwargs = {'log': False}
+                        # we use the default matcher in tracking target.
+                        l_dict = self.get_loss(loss, aux_outputs, targets, indices_track, num_boxes, **kwargs)
+                        l_dict = {k + f'_{i}': v for k, v in l_dict.items()}
+                        losses.update(l_dict)
+        else:
+            track_exists = "pred_tracks" in outputs_without_aux.keys()
+            if track_exists:
+                outputs_without_aux.pop("pred_tracks")
+            # Retrieve the matching between the outputs of the last layer and the targets
+            indices_track = self.matcher(outputs_without_aux, targets)
+            # Compute the average number of target boxes accross all nodes, for normalization purposes
+            num_boxes = sum(len(t["labels"]) for t in targets)
+            num_boxes = torch.as_tensor([num_boxes], dtype=torch.float, device=next(iter(outputs.values())).device)
+            if is_dist_avail_and_initialized():
+                torch.distributed.all_reduce(num_boxes)
+            num_boxes = torch.clamp(num_boxes / get_world_size(), min=1).item()
+            # Compute all the requested losses
+            losses = {}
+            for loss in self.losses:
+                losses.update(self.get_loss(loss, outputs, targets, indices_track, num_boxes))
+            # In case of auxiliary losses, we repeat this process with the output of each intermediate layer.
+            if 'aux_outputs' in outputs:
+                for i, aux_outputs in enumerate(outputs['aux_outputs']):
+                    if track_exists:
+                        aux_outputs.pop("pred_tracks")
+                    indices = self.matcher(aux_outputs, targets)
+                    for loss in self.losses:
+                        if loss == 'masks':
+                            # Intermediate masks losses are too costly to compute, we ignore them.
+                            continue
+                        kwargs = {}
+                        if loss == 'labels':
+                            # Logging is enabled only for the last layer
+                            kwargs = {'log': False}
+                        l_dict = self.get_loss(loss, aux_outputs, targets, indices, num_boxes, **kwargs)
+                        l_dict = {k + f'_{i}': v for k, v in l_dict.items()}
+                        losses.update(l_dict)
 
-        # Compute the average number of target boxes accross all nodes, for normalization purposes
-        num_boxes = sum(len(t["labels"]) for t in targets)
-        num_boxes = torch.as_tensor([num_boxes], dtype=torch.float, device=next(iter(outputs.values())).device)
-        if is_dist_avail_and_initialized():
-            torch.distributed.all_reduce(num_boxes)
-        num_boxes = torch.clamp(num_boxes / get_world_size(), min=1).item()
-
-        # Compute all the requested losses
-        losses = {}
-        for loss in self.losses:
-            losses.update(self.get_loss(loss, outputs, targets, indices, num_boxes))
-
-        # In case of auxiliary losses, we repeat this process with the output of each intermediate layer.
-        if 'aux_outputs' in outputs:
-            for i, aux_outputs in enumerate(outputs['aux_outputs']):
-                indices = self.matcher(aux_outputs, targets)
-                for loss in self.losses:
-                    if loss == 'masks':
-                        # Intermediate masks losses are too costly to compute, we ignore them.
-                        continue
-                    kwargs = {}
-                    if loss == 'labels':
-                        # Logging is enabled only for the last layer
-                        kwargs = {'log': False}
-                    l_dict = self.get_loss(loss, aux_outputs, targets, indices, num_boxes, **kwargs)
-                    l_dict = {k + f'_{i}': v for k, v in l_dict.items()}
-                    losses.update(l_dict)
-
-        return losses
+        return losses, indices_track
 
 
 class PostProcess(nn.Module):
@@ -335,6 +451,7 @@ def build(args):
     if args.masks:
         model = DETRsegm(model, freeze_detr=(args.frozen_weights is not None))
     matcher = build_matcher(args)
+    track_matcher = build_track_matcher(args)
     weight_dict = {'loss_ce': 1, 'loss_bbox': args.bbox_loss_coef}
     weight_dict['loss_giou'] = args.giou_loss_coef
     if args.masks:
@@ -350,8 +467,8 @@ def build(args):
     losses = ['labels', 'boxes', 'cardinality']
     if args.masks:
         losses += ["masks"]
-    criterion = SetCriterion(num_classes, matcher=matcher, weight_dict=weight_dict,
-                             eos_coef=args.eos_coef, losses=losses)
+    criterion = SetCriterion(num_classes, matcher=matcher, track_matcher=track_matcher,
+                             weight_dict=weight_dict, eos_coef=args.eos_coef, losses=losses)
     criterion.to(device)
     postprocessors = {'bbox': PostProcess()}
     if args.masks:
