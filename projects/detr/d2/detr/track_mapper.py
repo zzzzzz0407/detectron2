@@ -121,7 +121,7 @@ class DetrTrackMapper:
         self.is_train = is_train
         self.max_frame_dist = cfg.MODEL.DETR.MAX_FRAME_DIST
 
-        # video2img.
+        # video2img --> 问题可能是出在这边，每次得释放掉 / 考虑放到buttlen去试试.
         if self.is_train:
             self.dataset_dicts = get_detection_dataset_dicts(
                 cfg.DATASETS.TRAIN,
