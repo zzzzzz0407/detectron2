@@ -203,9 +203,9 @@ def setup(args):
     cfg.merge_from_file(args.config_file)
     cfg.merge_from_list(args.opts)
     if args.eval_only:
-        pass
+        # pass
         # It's important to set num_worker = 1 for tracking.
-        # cfg.DATALOADER.NUM_WORKERS = 2
+        cfg.DATALOADER.NUM_WORKERS = 1
     cfg.freeze()
     default_setup(cfg, args)
     return cfg
