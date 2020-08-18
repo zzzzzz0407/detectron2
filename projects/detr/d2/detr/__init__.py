@@ -8,6 +8,7 @@ from .crowdhuman import load_crowdhuman_json
 from .mot import load_mot_json
 from .resnet import build_two_stem_resnet_backbone
 from .build import build_detection_train_loader
+from .tracker import Tracker
 from . import builtin  # ensure the builtin datasets are registered
 
 

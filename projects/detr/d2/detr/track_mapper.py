@@ -113,7 +113,7 @@ class DetrTrackMapper:
 
         self.tfm_gens = build_transform_gen(cfg, is_train)
         logging.getLogger(__name__).info(
-            "Full TransformGens used in training: {}, crop: {}".format(str(self.tfm_gens), str(self.crop_gen))
+            "Full TransformGens used in pre-process: {}, crop: {}".format(str(self.tfm_gens), str(self.crop_gen))
         )
 
         self.img_format = cfg.INPUT.FORMAT
@@ -121,7 +121,7 @@ class DetrTrackMapper:
         self.is_train = is_train
         self.max_frame_dist = cfg.MODEL.DETR.MAX_FRAME_DIST
 
-        # video2img --> 问题可能是出在这边，每次得释放掉 / 考虑放到buttlen去试试.
+        # video2img --> 问题可能是出在这边，每次得释放掉 / 考虑放到builtin试试.
         if self.is_train:
             self.dataset_dicts = get_detection_dataset_dicts(
                 cfg.DATASETS.TRAIN,
@@ -136,9 +136,18 @@ class DetrTrackMapper:
                      "there are {} datasets now.".format(len(cfg.DATASETS.TRAIN)))
             self.video_to_images = MetadataCatalog.get(cfg.DATASETS.TRAIN[0]).video_to_images
             self.image_to_index = MetadataCatalog.get(cfg.DATASETS.TRAIN[0]).image_to_index
-
         else:
-            raise NotImplementedError
+            self.dataset_dicts = get_detection_dataset_dicts(
+                cfg.DATASETS.TEST,
+                filter_empty=False,
+                min_keypoints=0,
+                proposal_files=None
+            )
+            assert len(cfg.DATASETS.TEST) == 1, logging. \
+                info("Only support ONE dataset each time, however, "
+                     "there are {} datasets now.".format(len(cfg.DATASETS.TEST)))
+            self.video_to_images = MetadataCatalog.get(cfg.DATASETS.TEST[0]).video_to_images
+            self.image_to_index = MetadataCatalog.get(cfg.DATASETS.TEST[0]).image_to_index
 
     def _load_pre_data(self, video_id, frame_id, sensor_id=1):
         img_infos = self.video_to_images[video_id]
@@ -158,16 +167,17 @@ class DetrTrackMapper:
             pre_dict = self.dataset_dicts[self.image_to_index[img_id]]
             assert pre_dict['image_id'] == img_id
         else:
-            # todo: debug.
-            raise NotImplementedError
-            img_ids = [(img_info['id'], img_info['frame_id']) for img_info in img_infos
-                       if (img_info['frame_id'] - frame_id) == -1
-                       and (not ('sensor_id' in img_info) or img_info['sensor_id'] == sensor_id)]
-            if len(img_ids) == 0:
+            if frame_id == 1:
                 img_ids = [(img_info['id'], img_info['frame_id']) for img_info in img_infos
-                           if (img_info['frame_id'] - frame_id) == 0
+                           if abs(img_info['frame_id'] - frame_id) == 0
                            and (not ('sensor_id' in img_info) or img_info['sensor_id'] == sensor_id)]
-
+                assert img_ids[0][1] == frame_id
+            else:
+                img_ids = [(img_info['id'], img_info['frame_id']) for img_info in img_infos
+                           if frame_id - img_info['frame_id'] == 1
+                           and (not ('sensor_id' in img_info) or img_info['sensor_id'] == sensor_id)]
+                assert img_ids[0][1] == frame_id - 1
+            pre_dict = self.dataset_dicts[self.image_to_index[img_ids[0][0]]]
         return pre_dict
 
     def __call__(self, dataset_dict):

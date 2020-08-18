@@ -13,6 +13,7 @@ sys.path.insert(1, os.path.join(sys.path[0], '..'))
 
 import time
 from typing import Any, Dict, List, Set
+import logging
 
 import torch
 
@@ -20,13 +21,18 @@ import detectron2.utils.comm as comm
 from d2.detr import DetrDatasetMapper, add_detr_config, DetrTrackMapper
 from detectron2.checkpoint import DetectionCheckpointer
 from detectron2.config import get_cfg
-from detectron2.data import MetadataCatalog #, build_detection_train_loader
+from detectron2.data import build_detection_test_loader
+
+
+    # MetadataCatalog #, build_detection_train_loader
 from detectron2.engine import AutogradProfiler, DefaultTrainer, default_argument_parser, default_setup, launch
-from detectron2.evaluation import COCOEvaluator, verify_results
+from detectron2.evaluation import COCOEvaluator, verify_results # ,inference_on_dataset
 
 from detectron2.solver.build import maybe_add_gradient_clipping
 
 from d2.detr import build_detection_train_loader
+from d2.detr.inference import inference_on_dataset
+from d2.detr.tracker import Tracker
 
 
 class Trainer(DefaultTrainer):
@@ -115,6 +121,78 @@ class Trainer(DefaultTrainer):
             optimizer = maybe_add_gradient_clipping(cfg, optimizer)
         return optimizer
 
+    @classmethod
+    def build_test_loader(cls, cfg, dataset_name):
+        if cfg.MODEL.META_ARCHITECTURE == "DetrTrack":
+            mapper = DetrTrackMapper(cfg, False)
+        else:
+            mapper = None
+        return build_detection_test_loader(cfg, dataset_name, mapper=mapper)
+
+    @classmethod
+    def test(cls, cfg, model, evaluators=None):
+        """
+        Args:
+            cfg (CfgNode):
+            model (nn.Module):
+            evaluators (list[DatasetEvaluator] or None): if None, will call
+                :meth:`build_evaluator`. Otherwise, must have the same length as
+                `cfg.DATASETS.TEST`.
+
+        Returns:
+            dict: a dict of result metrics
+        """
+        logger = logging.getLogger(__name__)
+        for idx, dataset_name in enumerate(cfg.DATASETS.TEST):
+            data_loader = cls.build_test_loader(cfg, dataset_name)
+            tracker = Tracker(cfg)
+            results_i = inference_on_dataset(model, data_loader, tracker)
+
+
+
+
+
+
+
+        #if isinstance(evaluators, DatasetEvaluator):
+        #    evaluators = [evaluators]
+        # if evaluators is not None:
+        #    assert len(cfg.DATASETS.TEST) == len(evaluators), "{} != {}".format(
+        #        len(cfg.DATASETS.TEST), len(evaluators)
+        #    )
+
+        # results = OrderedDict()
+        for idx, dataset_name in enumerate(cfg.DATASETS.TEST):
+            data_loader = cls.build_test_loader(cfg, dataset_name)
+            # When evaluators are passed in as arguments,
+            # implicitly assume that evaluators can be created before data_loader.
+            if evaluators is not None:
+                evaluator = evaluators[idx]
+            else:
+                try:
+                    evaluator = cls.build_evaluator(cfg, dataset_name)
+                except NotImplementedError:
+                    logger.warn(
+                        "No evaluator found. Use `DefaultTrainer.test(evaluators=)`, "
+                        "or implement its `build_evaluator` method."
+                    )
+                    results[dataset_name] = {}
+                    continue
+            results_i = inference_on_dataset(model, data_loader, evaluator)
+            results[dataset_name] = results_i
+            if comm.is_main_process():
+                assert isinstance(
+                    results_i, dict
+                ), "Evaluator must return a dict on the main process. Got {} instead.".format(
+                    results_i
+                )
+                logger.info("Evaluation results for {} in csv format:".format(dataset_name))
+                print_csv_format(results_i)
+
+        if len(results) == 1:
+            results = list(results.values())[0]
+        return results
+
 
 def setup(args):
     """
@@ -124,6 +202,10 @@ def setup(args):
     add_detr_config(cfg)
     cfg.merge_from_file(args.config_file)
     cfg.merge_from_list(args.opts)
+    if args.eval_only:
+        pass
+        # It's important to set num_worker = 1 for tracking.
+        # cfg.DATALOADER.NUM_WORKERS = 2
     cfg.freeze()
     default_setup(cfg, args)
     return cfg

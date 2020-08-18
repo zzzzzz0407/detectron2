@@ -171,11 +171,9 @@ class DetrTrack(nn.Module):
             dict[str: Tensor]:
                 mapping from a named loss to a tensor storing the loss. Used during training only.
         """
-        images = self.preprocess_image(batched_inputs)
-        # detection.
-        output = self.detr(copy.deepcopy(images))
-
         if self.training:
+            # prepare images & gt.
+            images = self.preprocess_image(batched_inputs)
             if isinstance(batched_inputs[0], tuple):
                 gt_instances = list()
                 for paired_inputs in batched_inputs:
@@ -184,6 +182,8 @@ class DetrTrack(nn.Module):
             else:
                 gt_instances = [x["instances"].to(self.device) for x in batched_inputs]
 
+            # detection first.
+            output = self.detr(copy.deepcopy(images))
             output, pre_embed = output
             if self.track_on:
                 # generate targets for tracking.
@@ -231,6 +231,7 @@ class DetrTrack(nn.Module):
                                 losses_dict[k] = (losses_dict[k] + loss_dict[k] * weight_dict[k]) / 2
                 return losses_dict
             else:
+                raise NotImplementedError
                 targets = self.prepare_targets(gt_instances)
                 loss_dict = self.criterion(output, targets)
                 weight_dict = self.criterion.weight_dict
@@ -239,16 +240,34 @@ class DetrTrack(nn.Module):
                         loss_dict[k] *= weight_dict[k]
                 return loss_dict
         else:
+            assert len(batched_inputs) == 1, \
+                print("Only support ONE image each time during inference, "
+                      "while there are {} images now.".format(len(batched_inputs)))
+            # prepare images.
+            images = self.preprocess_image(batched_inputs)
+            if isinstance(batched_inputs[0], tuple):
+                cur_input = batched_inputs[0][0]
+                pre_embed = cur_input.get("pre_embed", None)
+            else:
+                raise NotImplementedError
+
+            # inference.
+            output = self.detr(images, pre_embed=pre_embed)
+            output, pre_embed = output
             box_cls = output["pred_logits"]
             box_pred = output["pred_boxes"]
-            results = self.inference(box_cls, box_pred, images.image_sizes)
+            if self.track_on:
+                box_track = output["pred_tracks"]
+                results = self.inference(box_cls, box_pred, images.image_sizes, box_track=box_track)
+            else:
+                raise NotImplementedError
             processed_results = []
-            for results_per_image, input_per_image, image_size in zip(results, batched_inputs, images.image_sizes):
+            for results_per_image, input_per_image, image_size in zip(results, batched_inputs[0], images.image_sizes):
                 height = input_per_image.get("height", image_size[0])
                 width = input_per_image.get("width", image_size[1])
                 r = detector_postprocess(results_per_image, height, width)
                 processed_results.append({"instances": r})
-            return processed_results
+            return processed_results, pre_embed.permute(1, 0, 2)
 
     def prepare_targets(self, targets):
         new_targets = []
@@ -280,7 +299,7 @@ class DetrTrack(nn.Module):
                     raise NotImplementedError
         return cur_targets, pre_targets
 
-    def inference(self, box_cls, box_pred, image_sizes):
+    def inference(self, box_cls, box_pred, image_sizes, **kwargs):
         """
         Arguments:
             box_cls (Tensor): tensor of shape (batch_size, num_queries, K).
@@ -294,13 +313,19 @@ class DetrTrack(nn.Module):
             results (List[Instances]): a list of #images elements.
         """
         assert len(box_cls) == len(image_sizes)
+        batchSize = len(image_sizes)
         results = []
+        if self.track_on:
+            if kwargs is not None:
+                box_track = kwargs["box_track"].sigmoid()
+            else:
+                raise NotImplementedError
 
         # For each box we assign the best class or the second best if the best on is `no_object`.
         scores, labels = F.softmax(box_cls, dim=-1)[:, :, :-1].max(-1)
 
-        for scores_per_image, labels_per_image, box_pred_per_image, image_size in zip(
-            scores, labels, box_pred, image_sizes
+        for index, scores_per_image, labels_per_image, box_pred_per_image, image_size in zip(
+            range(batchSize), scores, labels, box_pred, image_sizes
         ):
             result = Instances(image_size)
             result.pred_boxes = Boxes(box_cxcywh_to_xyxy(box_pred_per_image))
@@ -309,6 +334,8 @@ class DetrTrack(nn.Module):
 
             result.scores = scores_per_image
             result.pred_classes = labels_per_image
+            if self.track_on:
+                result.pred_tracks = box_track[index].squeeze(1)
             results.append(result)
         return results
 
