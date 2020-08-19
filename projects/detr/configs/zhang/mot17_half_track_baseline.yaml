@@ -18,12 +18,15 @@ MODEL:
     ENC_LAYERS: 0
     DEC_LAYERS: 3
     INDEX_FEEDFORWARD: -3 # res3
+    # track.
     MAX_FRAME_DIST: 3
     TRACK_ON: True
     TRACK_WEIGHT: 1.0
     TRACK_AUG: True
-    SCORE_THRESH: 0.4
-    TRACK_THRESH: 0.5
+    SCORE_THRESH: 0.4  # track阶段的score.
+    TRACK_THRESH: 0.0  # 是否追踪到目标的阈值，理论上选0.5，但是现在有点问题，预测值非常小，暂时用0.0用来调参.
+    FREEZE_DET: True   # phase 1 (det) 阶段不参与loss计算.
+    IGNORE_SAME: False  # 自身是否参与随机帧选取，false表示训练阶段可能pre和cur是同一帧.
 DATASETS:
   TRAIN: ("mot17_train_half",)
   TEST: ("mot17_val_half",)
@@ -54,5 +57,5 @@ TEST:
   EVAL_PERIOD: 0
 DATALOADER:
   FILTER_EMPTY_ANNOTATIONS: False
-  NUM_WORKERS: 2
+  NUM_WORKERS: 2  # --> 这个参数暂时不要动，别的参数可能会出现内存溢出问题，后期解决.
 VERSION: 2

@@ -1,6 +1,8 @@
 # coding: utf-8
-import numpy as np
 import copy
+import torch
+
+from detectron2.data import MetadataCatalog
 
 
 class Tracker(object):
@@ -10,149 +12,106 @@ class Tracker(object):
         self.score_thresh = cfg.MODEL.DETR.SCORE_THRESH
         self.track_thresh = cfg.MODEL.DETR.TRACK_THRESH
 
-        self.id_count = 0
-        self.track_ids = np.zeros(self.num_ins)
-        self.track_masks = np.zeros(self.num_ins)
+        category_mapper_o = MetadataCatalog.get(cfg.DATASETS.TEST[0]).thing_dataset_id_to_contiguous_id
+        category_mapper = dict()
+        for k, v in category_mapper_o.items():
+            category_mapper[v] = k
+        self.category_mapper = category_mapper
+
+        self.id_count = 0  # 累计至目前的id号 (从1开始).
+        self.track_ids = torch.zeros(self.num_ins)  # 上一帧的各位置的ID号.
+        self.track_masks = torch.zeros(self.num_ins)  # 上一帧的目标位置 True/False.
         self.reset_all()
 
     def reset_all(self):
         self.id_count = 0
-        self.track_ids = np.zeros(self.num_ins)
-        self.track_masks = np.zeros(self.num_ins)
+        self.track_ids = torch.zeros(self.num_ins)
+        self.track_masks = torch.zeros(self.num_ins)
+
+    def reset(self):
+        self.track_ids = torch.zeros(self.num_ins)
+        self.track_masks = torch.zeros(self.num_ins)
 
     def init_track(self, results):
-        ret = dict()
+        ret = list()
 
+        # filter.
         scores = results.scores
         score_filter = scores >= self.score_thresh
-        self.track_masks = score_filter.float().cpu().numpy()
+        self.track_masks = score_filter.clone()
 
+        scores = scores[score_filter]
         classes = results.pred_classes[score_filter]
         bboxes = results.pred_boxes.tensor[score_filter, :]
+        num_obj = score_filter.sum()
+        loc_obj = score_filter.nonzero()
 
-        for item in results:
-            if item['score'] > self.opt.new_thresh:
-                self.id_count += 1
-                # active and age are never used in the paper
-                item['active'] = 1
-                item['age'] = 1
-                item['tracking_id'] = self.id_count
-                if not ('ct' in item):
-                    bbox = item['bbox']
-                    item['ct'] = [(bbox[0] + bbox[2]) / 2, (bbox[1] + bbox[3]) / 2]
-                    self.tracks.append(item)
+        for idx in range(num_obj):
+            # update property.
+            self.id_count += 1
+            self.track_ids[loc_obj[idx]] = self.id_count
 
+            # add pred.
+            obj = dict()
+            obj["score"] = float(scores[idx])
+            obj["class"] = self.category_mapper[int(classes[idx])]
+            obj["bbox"] = bboxes[idx, :].cpu().numpy().tolist()
+            obj["tracking_id"] = self.id_count
+            ret.append(obj)
 
-
-    def step(self, results, public_det=None):
-        N = len(results)
-        M = len(self.tracks)
-
-        dets = np.array(
-          [det['ct'] + det['tracking'] for det in results], np.float32)  # N x 2
-        track_size = np.array([((track['bbox'][2] - track['bbox'][0]) * \
-          (track['bbox'][3] - track['bbox'][1])) \
-          for track in self.tracks], np.float32) # M
-        track_cat = np.array([track['class'] for track in self.tracks], np.int32) # M
-        item_size = np.array([((item['bbox'][2] - item['bbox'][0]) * \
-          (item['bbox'][3] - item['bbox'][1])) \
-          for item in results], np.float32) # N
-        item_cat = np.array([item['class'] for item in results], np.int32) # N
-        tracks = np.array(
-          [pre_det['ct'] for pre_det in self.tracks], np.float32) # M x 2
-        dist = (((tracks.reshape(1, -1, 2) - \
-                  dets.reshape(-1, 1, 2)) ** 2).sum(axis=2)) # N x M
-
-        invalid = ((dist > track_size.reshape(1, M)) + \
-          (dist > item_size.reshape(N, 1)) + \
-          (item_cat.reshape(N, 1) != track_cat.reshape(1, M))) > 0
-        dist = dist + invalid * 1e18
-
-        if self.opt.hungarian:
-            item_score = np.array([item['score'] for item in results], np.float32) # N
-            dist[dist > 1e18] = 1e18
-            matched_indices = linear_assignment(dist)
-        else:
-            matched_indices = greedy_assignment(copy.deepcopy(dist))
-        unmatched_dets = [d for d in range(dets.shape[0])
-                          if not (d in matched_indices[:, 0])]
-        unmatched_tracks = [d for d in range(tracks.shape[0]) \
-          if not (d in matched_indices[:, 1])]
-
-        if self.opt.hungarian:
-          matches = []
-          for m in matched_indices:
-            if dist[m[0], m[1]] > 1e16:
-              unmatched_dets.append(m[0])
-              unmatched_tracks.append(m[1])
-            else:
-              matches.append(m)
-          matches = np.array(matches).reshape(-1, 2)
-        else:
-          matches = matched_indices
-
-        ret = []
-        for m in matches:
-          track = results[m[0]]
-          track['tracking_id'] = self.tracks[m[1]]['tracking_id']
-          track['age'] = 1
-          track['active'] = self.tracks[m[1]]['active'] + 1
-          ret.append(track)
-
-        if self.opt.public_det and len(unmatched_dets) > 0:
-          # Public detection: only create tracks from provided detections
-          pub_dets = np.array([d['ct'] for d in public_det], np.float32)
-          dist3 = ((dets.reshape(-1, 1, 2) - pub_dets.reshape(1, -1, 2)) ** 2).sum(
-            axis=2)
-          matched_dets = [d for d in range(dets.shape[0]) \
-            if not (d in unmatched_dets)]
-          dist3[matched_dets] = 1e18
-          for j in range(len(pub_dets)):
-            i = dist3[:, j].argmin()
-            if dist3[i, j] < item_size[i]:
-              dist3[i, :] = 1e18
-              track = results[i]
-              if track['score'] > self.opt.new_thresh:
-                self.id_count += 1
-                track['tracking_id'] = self.id_count
-                track['age'] = 1
-                track['active'] = 1
-                ret.append(track)
-        else:
-          # Private detection: create tracks for all un-matched detections
-          for i in unmatched_dets:
-            track = results[i]
-            if track['score'] > self.opt.new_thresh:
-              self.id_count += 1
-              track['tracking_id'] = self.id_count
-              track['age'] = 1
-              track['active'] =  1
-              ret.append(track)
-
-        # Never used
-        for i in unmatched_tracks:
-          track = self.tracks[i]
-          if track['age'] < self.opt.max_age:
-            track['age'] += 1
-            track['active'] = 1 # 0
-            bbox = track['bbox']
-            ct = track['ct']
-            track['bbox'] = [
-              bbox[0] + v[0], bbox[1] + v[1],
-              bbox[2] + v[0], bbox[3] + v[1]]
-            track['ct'] = [ct[0] + v[0], ct[1] + v[1]]
-            ret.append(track)
-        self.tracks = ret
         return ret
 
+    def step(self, results, public_det=None):
+        ret = list()
 
-def greedy_assignment(dist):
-    matched_indices = []
-    if dist.shape[1] == 0:
-        return np.array(matched_indices, np.int32).reshape(-1, 2)
-    for i in range(dist.shape[0]):
-        j = dist[i].argmin()
-        if dist[i][j] < 1e16:
-            dist[:, j] = 1e18
-            matched_indices.append([i, j])
-    return np.array(matched_indices, np.int32).reshape(-1, 2)
+        # filter.
+        scores = results.scores
+        tracks = results.pred_tracks
+        score_filter = scores >= self.score_thresh
+        track_filter = tracks >= self.track_thresh
+        track_masks = self.track_masks
+        match_filter = score_filter & track_filter & track_masks
+
+        # matched items.
+        scores_m = scores[match_filter]
+        classes_m = results.pred_classes[match_filter]
+        bboxes_m = results.pred_boxes.tensor[match_filter, :]
+        num_obj_m = match_filter.sum()
+        track_ids = self.track_ids[match_filter]
+
+        for idx in range(num_obj_m):
+            # add pred.
+            obj = dict()
+            obj["score"] = float(scores_m[idx])
+            obj["class"] = self.category_mapper[int(classes_m[idx])]
+            obj["bbox"] = bboxes_m[idx, :].cpu().numpy().tolist()
+            obj["tracking_id"] = int(track_ids[idx])
+            ret.append(obj)
+
+        # update.
+        self.track_ids *= match_filter.cpu()
+        self.track_masks = score_filter.clone()
+
+        # new items.
+        new_filter = score_filter ^ match_filter
+        scores_n = scores[new_filter]
+        classes_n = results.pred_classes[new_filter]
+        bboxes_n = results.pred_boxes.tensor[new_filter, :]
+        num_obj_n = new_filter.sum()
+        loc_obj_n = new_filter.nonzero()
+
+        for idx in range(num_obj_n):
+            # update property.
+            self.id_count += 1
+            self.track_ids[loc_obj_n[idx]] = self.id_count
+
+            # add pred.
+            obj = dict()
+            obj["score"] = float(scores_n[idx])
+            obj["class"] = self.category_mapper[int(classes_n[idx])]
+            obj["bbox"] = bboxes_n[idx, :].cpu().numpy().tolist()
+            obj["tracking_id"] = self.id_count
+            ret.append(obj)
+        assert (self.track_ids > 0).sum() == self.track_masks.sum()
+
+        return ret

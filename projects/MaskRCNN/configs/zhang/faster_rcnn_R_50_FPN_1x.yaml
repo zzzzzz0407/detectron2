@@ -11,7 +11,7 @@ MODEL:
   #   NAME: "SemiMaskRCNNConvUpsampleHead"
 DATASETS:
   TRAIN: ("instances_train2017_semi_0.1_min_200",)
-  TEST: ("coco_2017_train",)
+  TEST: ("coco_2017_val",)
 # TEST:
 #  AUG:
 #    ENABLED: True

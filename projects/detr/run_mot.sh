@@ -39,7 +39,7 @@ PRETRAINED=${CURDIR}/checkpoints/crowdhuman_baseline.pth
 
 hdfs dfs -mkdir -p ${HDFS_DIR}
 
-python3 ${CURDIR}/train_net.py --dist-url ${URL} \
+python3 ${CURDIR}/track_train.py --dist-url ${URL} \
 --config-file ${CONFIG_FILE} \
 --num-gpus ${GPU_NUM} OUTPUT_DIR ${OUTPUT_DIR} \
 MODEL.WEIGHTS ${PRETRAINED}

@@ -100,7 +100,7 @@ class DatasetEvaluators(DatasetEvaluator):
         return results
 
 
-def inference_on_dataset(model, data_loader, tracker):
+def inference_on_dataset(model, data_loader, tracker, evaluator):
     """
     Run model on the data_loader and evaluate the metrics with evaluator.
     Also benchmark the inference speed of `model.forward` accurately.
@@ -121,26 +121,32 @@ def inference_on_dataset(model, data_loader, tracker):
         The return value of `evaluator.evaluate()`
     """
     num_devices = get_world_size()
-    logger = logging.getLogger(__name__)
+    logger = logging.getLogger("detectron2")
     logger.info("Start inference on {} images".format(len(data_loader)))
-    total = len(data_loader)  # inference data loader must have a fixed length
 
+    total = len(data_loader)  # inference data loader must have a fixed length
+    if evaluator is None:
+        # create a no-op evaluator
+        evaluator = DatasetEvaluators([])
+    evaluator.reset()
 
     num_warmup = min(5, total - 1)
     start_time = time.perf_counter()
     total_compute_time = 0
-    results = dict()
-    pre_embed = None
+    res_tracks = dict()
     with inference_context(model), torch.no_grad():
         for idx, inputs in enumerate(data_loader):
             # pre process.
             assert len(inputs) == 1
             assert isinstance(inputs[0], tuple)
-            inputs[0][0]["pre_embed"] = pre_embed
             frame_id = inputs[0][0].get("frame_id", None)
             assert frame_id is not None
             if frame_id == 1:
                 tracker.reset_all()
+                # warm up for first frame.
+                _, pre_embed = model(inputs)
+            # add pre embed to inputs.
+            inputs[0][0]["pre_embed"] = pre_embed
 
             if idx == num_warmup:
                 start_time = time.perf_counter()
@@ -152,17 +158,14 @@ def inference_on_dataset(model, data_loader, tracker):
             if torch.cuda.is_available():
                 torch.cuda.synchronize()
             total_compute_time += time.perf_counter() - start_compute_time
+            evaluator.process([inputs[0][0]], outputs)
 
             # post process.
-            # if frame_id == 1:
-            #   result = tracker.init_track(outputs[0]["instances"])
-            #else:
-            #    pass
-
-
-
-
-
+            if frame_id == 1:
+                res_track = tracker.init_track(outputs[0]["instances"])
+            else:
+                res_track = tracker.step(outputs[0]["instances"])
+            res_tracks[inputs[0][0]["image_id"]] = res_track
 
             iters_after_start = idx + 1 - num_warmup * int(idx >= num_warmup)
             seconds_per_img = total_compute_time / iters_after_start
@@ -175,6 +178,7 @@ def inference_on_dataset(model, data_loader, tracker):
                         idx + 1, total, seconds_per_img, str(eta)
                     ),
                     n=5,
+                    name="detectron2"
                 )
 
     # Measure the time only for this worker (before the synchronization barrier)
@@ -198,7 +202,7 @@ def inference_on_dataset(model, data_loader, tracker):
     # Replace it by an empty dict instead to make it easier for downstream code to handle
     if results is None:
         results = {}
-    return results
+    return results, res_tracks
 
 
 @contextmanager

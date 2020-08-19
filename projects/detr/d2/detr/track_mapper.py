@@ -112,7 +112,7 @@ class DetrTrackMapper:
         assert not cfg.MODEL.MASK_ON, "Mask is not supported"
 
         self.tfm_gens = build_transform_gen(cfg, is_train)
-        logging.getLogger(__name__).info(
+        logging.getLogger("detectron2").info(
             "Full TransformGens used in pre-process: {}, crop: {}".format(str(self.tfm_gens), str(self.crop_gen))
         )
 
@@ -120,8 +120,9 @@ class DetrTrackMapper:
         self.zip_read = cfg.INPUT.ZIP_READ
         self.is_train = is_train
         self.max_frame_dist = cfg.MODEL.DETR.MAX_FRAME_DIST
+        self.ignore_same = cfg.MODEL.DETR.IGNORE_SAME
 
-        # video2img --> 问题可能是出在这边，每次得释放掉 / 考虑放到builtin试试.
+        # video2img --> 爆内存问题可能是出在这边，每次得释放掉 / 考虑放到builtin试试.
         if self.is_train:
             self.dataset_dicts = get_detection_dataset_dicts(
                 cfg.DATASETS.TRAIN,
@@ -158,15 +159,20 @@ class DetrTrackMapper:
                        if abs(img_info['frame_id'] - frame_id) < self.max_frame_dist
                        and (not ('sensor_id' in img_info) or img_info['sensor_id'] == sensor_id)]
 
-            frame_dist = 0
-            while not frame_dist:   # not self.
+            if self.ignore_same:
+                frame_dist = 0
+                while not frame_dist:   # not self.
+                    rand_id = np.random.choice(len(img_ids))
+                    img_id, pre_frame_id = img_ids[rand_id]
+                    frame_dist = abs(frame_id - pre_frame_id)
+            else:
                 rand_id = np.random.choice(len(img_ids))
                 img_id, pre_frame_id = img_ids[rand_id]
-                frame_dist = abs(frame_id - pre_frame_id)
 
             pre_dict = self.dataset_dicts[self.image_to_index[img_id]]
             assert pre_dict['image_id'] == img_id
-        else:
+
+        else:  # --> 这种读取方式可能不够快，后面看看能不能更快地得到pre_dict / 暂时问题不大.
             if frame_id == 1:
                 img_ids = [(img_info['id'], img_info['frame_id']) for img_info in img_infos
                            if abs(img_info['frame_id'] - frame_id) == 0

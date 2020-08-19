@@ -107,6 +107,7 @@ class DetrTrack(nn.Module):
         # Track parameters.
         self.track_on = cfg.MODEL.DETR.TRACK_ON
         self.track_aug = cfg.MODEL.DETR.TRACK_AUG
+        self.freeze_det = cfg.MODEL.DETR.FREEZE_DET
 
         N_steps = hidden_dim // 2
         d2_backbone = MaskedBackbone(cfg)
@@ -222,7 +223,10 @@ class DetrTrack(nn.Module):
                 # aggregate losses.
                 losses_dict = dict()
                 weight_dict = self.criterion.weight_dict
-                for loss_dict in [loss_det, loss_track]:
+                loss_candidates = [loss_det, loss_track]
+                if self.freeze_det:
+                    loss_candidates.pop(0)
+                for loss_dict in loss_candidates:
                     for k in loss_dict.keys():
                         if k in weight_dict:
                             if k not in losses_dict.keys():

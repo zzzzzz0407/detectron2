@@ -39,3 +39,6 @@ def add_detr_config(cfg):
     cfg.MODEL.DETR.TRACK_AUG = False
     cfg.MODEL.DETR.SCORE_THRESH = 0.4
     cfg.MODEL.DETR.TRACK_THRESH = 0.5
+    # cfg.MODEL.DETR.FRAME_WARM = True
+    cfg.MODEL.DETR.FREEZE_DET = False
+    cfg.MODEL.DETR.IGNORE_SAME = False

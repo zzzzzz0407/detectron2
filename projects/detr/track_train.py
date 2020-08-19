@@ -14,21 +14,19 @@ sys.path.insert(1, os.path.join(sys.path[0], '..'))
 import time
 from typing import Any, Dict, List, Set
 import logging
-
+from collections import OrderedDict
 import torch
+import json
 
 import detectron2.utils.comm as comm
 from d2.detr import DetrDatasetMapper, add_detr_config, DetrTrackMapper
 from detectron2.checkpoint import DetectionCheckpointer
 from detectron2.config import get_cfg
-from detectron2.data import build_detection_test_loader
-
-
-    # MetadataCatalog #, build_detection_train_loader
+from detectron2.data import build_detection_test_loader # MetadataCatalog #, build_detection_train_loader
 from detectron2.engine import AutogradProfiler, DefaultTrainer, default_argument_parser, default_setup, launch
-from detectron2.evaluation import COCOEvaluator, verify_results # ,inference_on_dataset
-
+from detectron2.evaluation import COCOEvaluator, verify_results, DatasetEvaluator, print_csv_format # ,inference_on_dataset
 from detectron2.solver.build import maybe_add_gradient_clipping
+from fvcore.common.file_io import PathManager
 
 from d2.detr import build_detection_train_loader
 from d2.detr.inference import inference_on_dataset
@@ -142,26 +140,15 @@ class Trainer(DefaultTrainer):
         Returns:
             dict: a dict of result metrics
         """
-        logger = logging.getLogger(__name__)
-        for idx, dataset_name in enumerate(cfg.DATASETS.TEST):
-            data_loader = cls.build_test_loader(cfg, dataset_name)
-            tracker = Tracker(cfg)
-            results_i = inference_on_dataset(model, data_loader, tracker)
+        logger = logging.getLogger("detectron2")
+        if isinstance(evaluators, DatasetEvaluator):
+            evaluators = [evaluators]
+        if evaluators is not None:
+            assert len(cfg.DATASETS.TEST) == len(evaluators), "{} != {}".format(
+                len(cfg.DATASETS.TEST), len(evaluators)
+            )
 
-
-
-
-
-
-
-        #if isinstance(evaluators, DatasetEvaluator):
-        #    evaluators = [evaluators]
-        # if evaluators is not None:
-        #    assert len(cfg.DATASETS.TEST) == len(evaluators), "{} != {}".format(
-        #        len(cfg.DATASETS.TEST), len(evaluators)
-        #    )
-
-        # results = OrderedDict()
+        results = OrderedDict()
         for idx, dataset_name in enumerate(cfg.DATASETS.TEST):
             data_loader = cls.build_test_loader(cfg, dataset_name)
             # When evaluators are passed in as arguments,
@@ -178,7 +165,9 @@ class Trainer(DefaultTrainer):
                     )
                     results[dataset_name] = {}
                     continue
-            results_i = inference_on_dataset(model, data_loader, evaluator)
+            # inference.
+            tracker = Tracker(cfg)
+            results_i, res_tracks = inference_on_dataset(model, data_loader, tracker, evaluator)
             results[dataset_name] = results_i
             if comm.is_main_process():
                 assert isinstance(
@@ -189,8 +178,16 @@ class Trainer(DefaultTrainer):
                 logger.info("Evaluation results for {} in csv format:".format(dataset_name))
                 print_csv_format(results_i)
 
+                if res_tracks is not None:
+                    file_path = os.path.join(cfg.OUTPUT_DIR, "inference", "track_results.json")
+                    logger.info("Saving tracking results to {}".format(file_path))
+                    with PathManager.open(file_path, "w") as f:
+                        f.write(json.dumps(res_tracks))
+                        f.flush()
+
         if len(results) == 1:
             results = list(results.values())[0]
+
         return results
 
 
@@ -203,7 +200,6 @@ def setup(args):
     cfg.merge_from_file(args.config_file)
     cfg.merge_from_list(args.opts)
     if args.eval_only:
-        # pass
         # It's important to set num_worker = 1 for tracking.
         cfg.DATALOADER.NUM_WORKERS = 1
     cfg.freeze()

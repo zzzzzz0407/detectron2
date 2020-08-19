@@ -332,7 +332,7 @@ def build_detection_train_loader(cfg, mapper=None):
     dataset = MapDataset(dataset, mapper)
 
     sampler_name = cfg.DATALOADER.SAMPLER_TRAIN
-    logger = logging.getLogger(__name__)
+    logger = logging.getLogger("detectron2")
     logger.info("Using training sampler {}".format(sampler_name))
     # TODO avoid if-else?
     if sampler_name == "TrainingSampler":
