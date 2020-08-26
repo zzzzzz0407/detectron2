@@ -215,6 +215,8 @@ def read_image(file_name, format=None):
             supported image modes in PIL or "BGR"; float (0-1 for Y) for YUV-BT.601.
     """
     image = zipimread(file_name)
+    if format == "RGB":
+        image = image[:, :, ::-1]
     return image
 
     """
